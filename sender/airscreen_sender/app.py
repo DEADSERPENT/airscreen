@@ -37,6 +37,7 @@ DEFAULT_SETTINGS = {
     "fps": "auto",         # auto | 30 | 60
     "bitrate": "auto",     # auto | kbit/s as a number
     "audio": True,
+    "mute_pc": True,        # play sound on the TV only
     "cursor": True,
     "reconnect": True,
     "last_receiver": "",
@@ -161,7 +162,7 @@ class Api:
     def _build_config(self, ip: str, port: int) -> Config:
         st = self.settings
         cfg = Config(receiver_ip=ip, receiver_port=port, audio=bool(st["audio"]), cursor=bool(st["cursor"]),
-                     reconnect=bool(st["reconnect"]))
+                     reconnect=bool(st["reconnect"]), mute_pc_audio=bool(st.get("mute_pc", True)))
         cfg.ffmpeg_path = resolve_ffmpeg(cfg.ffmpeg_path)
         if st["resolution"] == "source":
             cfg.auto_quality, cfg.width, cfg.height = False, 0, 0
@@ -254,6 +255,8 @@ class Api:
 
 
 def run() -> int:
+    from .audio.speaker_mute import SpeakerMute
+    SpeakerMute.recover()      # undo a mute left by a crashed previous run
     api = Api()
     index = ui_dir() / "index.html"
     window = webview.create_window(

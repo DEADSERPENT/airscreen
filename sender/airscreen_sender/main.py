@@ -23,6 +23,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--allow-cpu", action="store_true", help="permit libx264 (CPU) instead of NVENC; never automatic")
     p.add_argument("--code", help="pairing code shown on the TV (first connection only)")
     p.add_argument("--no-audio", action="store_true")
+    p.add_argument("--keep-pc-audio", action="store_true", help="do not mute this PC while streaming")
     p.add_argument("--no-cursor", action="store_true")
     p.add_argument("--no-reconnect", action="store_true")
     p.add_argument("--discover", action="store_true", help="list receivers found via mDNS and exit")
@@ -58,6 +59,8 @@ def config_from_args(a: argparse.Namespace) -> Config:
         cfg.ffmpeg_path = a.ffmpeg
     if a.no_audio:
         cfg.audio = False
+    if a.keep_pc_audio:
+        cfg.mute_pc_audio = False
     if a.no_cursor:
         cfg.cursor = False
     if a.no_reconnect:
@@ -69,6 +72,8 @@ def config_from_args(a: argparse.Namespace) -> Config:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from .audio.speaker_mute import SpeakerMute
+    SpeakerMute.recover()      # undo a mute left by a crashed previous run
     a = build_parser().parse_args(argv)
     try:
         cfg = config_from_args(a)

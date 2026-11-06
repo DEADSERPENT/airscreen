@@ -7,7 +7,8 @@ from collections import deque
 from typing import Callable
 
 from ..config.settings import Config
-from .annexb import AccessUnitSplitter
+from .flv import FlvVideoParser
+from .sps import patch_sps
 
 
 def build_command(cfg: Config, src_w: int, src_h: int) -> list[str]:
@@ -18,6 +19,7 @@ def build_command(cfg: Config, src_w: int, src_h: int) -> list[str]:
     vf.append("format=nv12")
     cmd = [
         cfg.ffmpeg_path, "-hide_banner", "-loglevel", "warning", "-nostats",
+        "-fflags", "nobuffer", "-flags", "low_delay", "-probesize", "32", "-analyzeduration", "0",
         "-f", "rawvideo", "-pix_fmt", "bgra", "-s", f"{src_w}x{src_h}", "-framerate", str(cfg.fps),
         "-i", "pipe:0",
         "-vf", ",".join(vf),
@@ -28,17 +30,17 @@ def build_command(cfg: Config, src_w: int, src_h: int) -> list[str]:
             "-preset", "p3", "-tune", "ull", "-profile:v", "high", "-rc", "cbr",
             "-b:v", f"{cfg.bitrate_kbps}k", "-maxrate", f"{cfg.bitrate_kbps}k",
             "-bufsize", f"{cfg.bitrate_kbps // cfg.fps * 2}k",  # ~2 frames: low latency
-            "-bf", "0", "-g", str(cfg.fps), "-forced-idr", "1", "-aud", "1", "-zerolatency", "1",
+            "-bf", "0", "-refs", "1", "-delay", "0", "-rc-lookahead", "0", "-g", str(cfg.fps),
+            "-forced-idr", "1", "-zerolatency", "1",
         ]
     else:  # libx264, only reachable with allow_cpu_fallback
         cmd += [
             "-preset", "ultrafast", "-tune", "zerolatency", "-profile:v", "high",
             "-b:v", f"{cfg.bitrate_kbps}k", "-maxrate", f"{cfg.bitrate_kbps}k",
             "-bufsize", f"{cfg.bitrate_kbps // cfg.fps * 2}k", "-g", str(cfg.fps), "-bf", "0",
-            "-x264-params", "aud=1",
         ]
-    # Repeat SPS/PPS in front of every keyframe so a receiver can join/recover at any IDR.
-    cmd += ["-bsf:v", "dump_extra=freq=keyframe", "-f", "h264", "pipe:1"]
+    # FLV gives exact frame boundaries (no waiting for the next frame); the parser re-adds SPS/PPS on every keyframe.
+    cmd += ["-fps_mode", "passthrough", "-flush_packets", "1", "-flvflags", "no_duration_filesize", "-f", "flv", "pipe:1"]
     return cmd
 
 
@@ -75,13 +77,13 @@ class FfmpegEncoder:
         self.frames_in += 1
 
     def _read_stdout(self) -> None:
-        splitter = AccessUnitSplitter()
+        parser = FlvVideoParser(sps_filter=patch_sps)
         stdout = self._proc.stdout
         while True:
             chunk = stdout.read(65536)
             if not chunk:
                 break
-            for au, key in splitter.feed(chunk):
+            for au, key in parser.feed(chunk):
                 self.access_units_out += 1
                 self.bytes_out += len(au)
                 self._on_au(au, key)

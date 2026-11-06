@@ -43,6 +43,9 @@ class VideoDecoder(
         val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, width, height)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) format.setInteger(MediaFormat.KEY_LOW_LATENCY, 1)
         format.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 2 * 1024 * 1024)
+        // real-time hints: priority 0 = real time; a high operating rate asks the decoder not to pace/buffer for 30 fps
+        format.setInteger(MediaFormat.KEY_PRIORITY, 0)
+        format.setInteger(MediaFormat.KEY_OPERATING_RATE, 120)
         // Hardware decoders (this TV's Realtek one) want the parameter sets up front, not only inline.
         if (sps != null) format.setByteBuffer("csd-0", ByteBuffer.wrap(sps))
         if (pps != null) format.setByteBuffer("csd-1", ByteBuffer.wrap(pps))
@@ -51,6 +54,7 @@ class VideoDecoder(
             codec = if (codecName.isNullOrEmpty()) MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
                     else MediaCodec.createByCodecName(codecName)
             Log.i(TAG, "decoder in use: ${codec.name}")
+            StreamStats.decoderName = codec.name
             codec.configure(format, surface, null, 0)
             codec.start()
         } catch (e: Exception) {
@@ -125,6 +129,8 @@ class VideoDecoder(
         latSumNs += ns; latCount++; if (ns > latMaxNs) latMaxNs = ns
         val now = System.nanoTime()
         if (now - latWindowStart >= 2_000_000_000L && latCount > 0) {
+            StreamStats.decodeMs = latSumNs / latCount / 1e6
+            StreamStats.dropped = framesDropped
             Log.i("AirScreenStats", "decode latency avg=%.1f ms max=%.1f ms frames=%d dropped=%d".format(
                 latSumNs / latCount / 1e6, latMaxNs / 1e6, latCount, framesDropped))
             latSumNs = 0; latMaxNs = 0; latCount = 0; latWindowStart = now

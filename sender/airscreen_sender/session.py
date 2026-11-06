@@ -8,6 +8,7 @@ import time
 from typing import Callable
 
 from .audio.pipeline import AudioError, AudioPipeline
+from .audio.speaker_mute import SpeakerMute
 from .capture.dxcam_capture import DesktopCapture
 from .config.settings import Config
 from .diagnostics import preflight
@@ -95,6 +96,7 @@ class StreamSession:
     def _stream_once(self) -> None:
         cfg = self.cfg
         capture = encoder = net = audio = None
+        speakers = None
         try:
             self._status("Checking encoder...")
             if cfg.encoder == "h264_nvenc":
@@ -116,6 +118,13 @@ class StreamSession:
                     if audio:
                         audio.stop()
                     audio = None
+
+            if audio_info and cfg.mute_pc_audio:
+                speakers = SpeakerMute()
+                if speakers.engage():
+                    self._status("PC speakers muted: sound plays on the TV")
+                else:
+                    speakers = None
 
             try:
                 net = TcpSender(cfg.receiver_ip, cfg.receiver_port, self.store, self.pairing_code)
@@ -183,6 +192,8 @@ class StreamSession:
                     enc_ms.clear(); net.net_ms.clear()
                     last_report, last_bytes, last_frames = now, net.sent_bytes, encoder.frames_in
         finally:
+            if speakers:
+                speakers.restore()          # always give the PC its sound back
             self._audio = None
             if audio:
                 audio.stop()

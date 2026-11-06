@@ -167,7 +167,8 @@ function render() {
   const cta = $("#cta");
   setClass(document.body, "streaming", ph === "streaming");
   setClass(cta, "loading", ph === "connecting"); setClass(cta, "stop", live); setClass(cta, "primary", !live);
-  setText("ctalabel", ph === "connecting" ? friendly("", ph, target && target.name) : live ? "Stop streaming" : "Start streaming");
+  setText("ctalabel", ph === "connecting" ? friendly("", ph, target && target.name) : live ? "Stop streaming" : (!target ? "Choose a TV" : "Start streaming"));
+  setClass(cta, "needs-tv", !live && ph !== "connecting" && !target);
   cta.setAttribute("aria-busy", String(ph === "connecting"));
 
   if (!target && S.settings.last_receiver) {

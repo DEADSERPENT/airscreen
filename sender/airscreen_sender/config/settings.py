@@ -46,6 +46,7 @@ class Config:
     cursor: bool = True
     audio: bool = True
     audio_bitrate_kbps: int = 192
+    mute_pc_audio: bool = True  # sound plays on the TV only while streaming
     reconnect: bool = True      # keep retrying after a network interruption
     ffmpeg_path: str = "ffmpeg"
     encoder: str = "h264_nvenc"

@@ -1,0 +1,141 @@
+{
+  "family": "AirScreen 3D Icons (monochrome)",
+  "version": "0.2.0",
+  "icons": [
+    {
+      "name": "icon-action-refresh",
+      "palette": "monochrome",
+      "source": "source/icon-action-refresh.svg",
+      "exports": [
+        "exports/icon-action-refresh@256.png",
+        "exports/icon-action-refresh@128.png"
+      ]
+    },
+    {
+      "name": "icon-audio-mute",
+      "palette": "monochrome",
+      "source": "source/icon-audio-mute.svg",
+      "exports": [
+        "exports/icon-audio-mute@256.png",
+        "exports/icon-audio-mute@128.png"
+      ]
+    },
+    {
+      "name": "icon-audio-volume",
+      "palette": "monochrome",
+      "source": "source/icon-audio-volume.svg",
+      "exports": [
+        "exports/icon-audio-volume@256.png",
+        "exports/icon-audio-volume@128.png"
+      ]
+    },
+    {
+      "name": "icon-device-desktop",
+      "palette": "monochrome",
+      "source": "source/icon-device-desktop.svg",
+      "exports": [
+        "exports/icon-device-desktop@256.png",
+        "exports/icon-device-desktop@128.png"
+      ]
+    },
+    {
+      "name": "icon-device-laptop",
+      "palette": "monochrome",
+      "source": "source/icon-device-laptop.svg",
+      "exports": [
+        "exports/icon-device-laptop@256.png",
+        "exports/icon-device-laptop@128.png"
+      ]
+    },
+    {
+      "name": "icon-device-tv",
+      "palette": "monochrome",
+      "source": "source/icon-device-tv.svg",
+      "exports": [
+        "exports/icon-device-tv@256.png",
+        "exports/icon-device-tv@128.png"
+      ]
+    },
+    {
+      "name": "icon-nav-about",
+      "palette": "monochrome",
+      "source": "source/icon-nav-about.svg",
+      "exports": [
+        "exports/icon-nav-about@256.png",
+        "exports/icon-nav-about@128.png"
+      ]
+    },
+    {
+      "name": "icon-nav-cast",
+      "palette": "monochrome",
+      "source": "source/icon-nav-cast.svg",
+      "exports": [
+        "exports/icon-nav-cast@256.png",
+        "exports/icon-nav-cast@128.png"
+      ]
+    },
+    {
+      "name": "icon-nav-devices",
+      "palette": "monochrome",
+      "source": "source/icon-nav-devices.svg",
+      "exports": [
+        "exports/icon-nav-devices@256.png",
+        "exports/icon-nav-devices@128.png"
+      ]
+    },
+    {
+      "name": "icon-nav-logs",
+      "palette": "monochrome",
+      "source": "source/icon-nav-logs.svg",
+      "exports": [
+        "exports/icon-nav-logs@256.png",
+        "exports/icon-nav-logs@128.png"
+      ]
+    },
+    {
+      "name": "icon-nav-settings",
+      "palette": "monochrome",
+      "source": "source/icon-nav-settings.svg",
+      "exports": [
+        "exports/icon-nav-settings@256.png",
+        "exports/icon-nav-settings@128.png"
+      ]
+    },
+    {
+      "name": "icon-nav-streaming",
+      "palette": "monochrome",
+      "source": "source/icon-nav-streaming.svg",
+      "exports": [
+        "exports/icon-nav-streaming@256.png",
+        "exports/icon-nav-streaming@128.png"
+      ]
+    },
+    {
+      "name": "icon-network-wifi",
+      "palette": "monochrome",
+      "source": "source/icon-network-wifi.svg",
+      "exports": [
+        "exports/icon-network-wifi@256.png",
+        "exports/icon-network-wifi@128.png"
+      ]
+    },
+    {
+      "name": "icon-security-shield",
+      "palette": "monochrome",
+      "source": "source/icon-security-shield.svg",
+      "exports": [
+        "exports/icon-security-shield@256.png",
+        "exports/icon-security-shield@128.png"
+      ]
+    },
+    {
+      "name": "icon-status-warning",
+      "palette": "monochrome",
+      "source": "source/icon-status-warning.svg",
+      "exports": [
+        "exports/icon-status-warning@256.png",
+        "exports/icon-status-warning@128.png"
+      ]
+    }
+  ]
+}
