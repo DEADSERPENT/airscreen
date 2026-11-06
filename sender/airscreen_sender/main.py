@@ -21,7 +21,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--bitrate", type=int, help="kbit/s")
     p.add_argument("--ffmpeg", help="path to ffmpeg.exe")
     p.add_argument("--allow-cpu", action="store_true", help="permit libx264 (CPU) instead of NVENC; never automatic")
-    p.add_argument("--code", help="pairing code shown on the TV (first connection only)")
+    p.add_argument("--code", help="pair key shown on the TV (first connection only), e.g. K7X-3QD")
     p.add_argument("--no-audio", action="store_true")
     p.add_argument("--keep-pc-audio", action="store_true", help="do not mute this PC while streaming")
     p.add_argument("--no-cursor", action="store_true")
@@ -128,6 +128,6 @@ def main(argv: list[str] | None = None) -> int:
         finally:
             session.stop()
         if session.pairing_required and sys.stdin.isatty() and not code:
-            code = input("Pairing code from the TV (XXXX-XXXX-XXXX-XXXX): ").strip()
+            code = input("Pair key shown on the TV (XXX-XXX): ").strip()
             continue
         return 1 if session.error else 0

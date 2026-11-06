@@ -117,7 +117,7 @@ class MainActivity : Activity(), SurfaceHolder.Callback, StreamServer.Listener {
         detailBody = findViewById(R.id.detailBody)
         detailBody2 = findViewById(R.id.detailBody2)
         detailHint = findViewById(R.id.detailHint)
-        codeTiles = listOf(R.id.code1, R.id.code2, R.id.code3, R.id.code4).map { findViewById<TextView>(it) }
+        codeTiles = listOf(R.id.code1, R.id.code2).map { findViewById<TextView>(it) }
 
         if (renderMode == "texture") {
             // The Realtek hardware decoder renders correctly through a GPU texture, not the direct video plane.
@@ -409,12 +409,17 @@ class MainActivity : Activity(), SurfaceHolder.Callback, StreamServer.Listener {
         }
     }
 
-    override fun onPairRequest(senderName: String): Boolean {
+    override fun onPairRequest(senderName: String, verify: String?): Boolean {
         val latch = CountDownLatch(1)
         val allowed = AtomicBoolean(false)
         pairDecision = { ok -> allowed.set(ok); latch.countDown() }
         ui.post {
             findViewById<TextView>(R.id.pairTitle).text = senderName
+            val vv = findViewById<TextView>(R.id.pairVerify)
+            vv.text = verify?.toCharArray()?.joinToString("  ") ?: ""
+            vv.visibility = if (verify != null) View.VISIBLE else View.GONE
+            findViewById<TextView>(R.id.pairNote).text =
+                if (verify != null) "Your PC is showing the same number. If it matches, choose Allow." else "Allow it only if you just started this on your PC."
             show(Layer.PAIR)
         }
         val answered = latch.await(30, TimeUnit.SECONDS)           // timeout = deny

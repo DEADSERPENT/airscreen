@@ -196,7 +196,7 @@
                     android:layout_height="wrap_content"
                     android:fontFamily="@font/inter"
                     android:letterSpacing="0.14"
-                    android:text="PAIRING CODE"
+                    android:text="PAIR KEY"
                     android:textColor="@color/text_tertiary"
                     android:textFontWeight="600"
                     android:textSize="12sp" />
@@ -213,14 +213,6 @@
 
                     <TextView
                         android:id="@+id/code2"
-                        style="@style/CodeTile" />
-
-                    <TextView
-                        android:id="@+id/code3"
-                        style="@style/CodeTile" />
-
-                    <TextView
-                        android:id="@+id/code4"
                         style="@style/CodeTile" />
                 </LinearLayout>
             </LinearLayout>
@@ -280,7 +272,7 @@
             android:layout_gravity="bottom|center_horizontal"
             android:fontFamily="@font/inter"
             android:letterSpacing="0.02"
-            android:text="Open AirScreen on your PC   ·   Choose this TV   ·   Enter the code"
+            android:text="Open AirScreen on your PC   ·   Enter this key   ·   Allow it here"
             android:textColor="@color/text_tertiary"
             android:textFontWeight="500"
             android:textSize="15sp" />
@@ -413,11 +405,25 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
                 android:fontFamily="@font/inter"
+                android:id="@+id/pairNote"
                 android:maxWidth="470dp"
-                android:text="It entered the correct pairing code. Allow it only if you just started this on your PC."
+                android:text="Allow it only if you just started this on your PC."
                 android:textColor="@color/text_tertiary"
                 android:textFontWeight="400"
                 android:textSize="17sp" />
+
+            <TextView
+                android:id="@+id/pairVerify"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:fontFamily="@font/inter"
+                android:fontFeatureSettings="&quot;tnum&quot; 1"
+                android:text=""
+                android:textColor="@color/text_primary"
+                android:textFontWeight="600"
+                android:textSize="46sp"
+                android:visibility="gone" />
 
             <LinearLayout
                 android:layout_width="wrap_content"

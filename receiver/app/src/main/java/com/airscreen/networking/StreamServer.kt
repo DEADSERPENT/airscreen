@@ -35,7 +35,7 @@ class StreamServer(
         fun onWaiting()
         fun onConnected(remote: String)
         /** Blocks the server thread until the person at the TV answers (or ~30 s pass). Must return false on timeout. */
-        fun onPairRequest(senderName: String): Boolean
+        fun onPairRequest(senderName: String, verify: String?): Boolean
         fun onPaired()
         fun onHello(hello: Hello)
         fun onVideo(data: ByteArray, ptsUs: Long, keyframe: Boolean)
@@ -167,37 +167,49 @@ class StreamServer(
 
         val nr = Crypto.randomBytes(16)
         val trustedKey = trust.getKey(deviceId)
-        send(out, Protocol.TYPE_AUTH_CHALLENGE, 0, JSONObject()
+        val eph = try { Crypto.newKeyPair() } catch (e: Exception) { null }       // P-256: supported on every Android version
+        val challenge = JSONObject()
             .put("nr", Crypto.hex(nr)).put("receiver_id", trust.receiverId).put("name", trust.name)
-            .put("trusted", trustedKey != null).put("caps", capabilities()))
+            .put("trusted", trustedKey != null).put("caps", capabilities())
+        if (eph != null) challenge.put("rpub", Crypto.hex(eph.second))
+        send(out, Protocol.TYPE_AUTH_CHALLENGE, 0, challenge)
 
         input.readFully(headerBytes)
         val h2 = Protocol.parseHeader(headerBytes)
         if (h2.type != Protocol.TYPE_AUTH_PROOF) throw Protocol.ProtocolException("expected proof")
         val proof = JSONObject(String(ByteArray(h2.length).also { input.readFully(it) }, Charsets.UTF_8))
         val mode = proof.getString("mode")
-        val secret: ByteArray? = when (mode) {
-            "trusted" -> trustedKey
-            "pair" -> pairing.secretForAttempt()
-            else -> null
+
+        if (mode == "request") {
+            // New PC: it must show the pair key from this screen, then a person approves here. Never silent.
+            val e = eph ?: fail(out, "this TV cannot pair by approval")
+            val keyBytes = pairing.secretForAttempt() ?: fail(out, "pairing is locked, try again shortly")
+            val given = proof.optString("key", "").uppercase().toByteArray()
+            if (!MessageDigest.isEqual(keyBytes, given)) {
+                pairing.registerFailure()
+                fail(out, "wrong pair key")
+            }
+            val peer = Crypto.unhex(proof.getString("pub"))
+            if (peer.size != 65) throw Protocol.ProtocolException("bad key")
+            val shared = Crypto.ecdh(e.first, peer)
+            val verify = Crypto.sas(shared, ns, nr)                    // the PC shows the same number: a mismatch means someone is in the middle
+            if (!listener.onPairRequest(sanitizeName(req.optString("name", "PC")), verify)) {
+                fail(out, "The TV did not approve this request")
+            }
+            send(out, Protocol.TYPE_AUTH_OK, 1, JSONObject().put("proof", Crypto.hex(Crypto.serverProof(shared, ns, nr))))
+            trust.trust(deviceId, Crypto.deviceKey(shared, ns, nr))
+            pairing.rotate()                                           // a pair key is single-use
+            listener.onPaired()
+            return Crypto.MediaCipher(Crypto.sessionKey(shared, ns, nr))
         }
-        if (secret == null) {
-            fail(out, if (mode == "pair") "pairing is locked, try again shortly" else "this device is not paired")
-        }
+
+        val secret = trustedKey ?: fail(out, "this device is not paired")
         val expected = Crypto.clientProof(secret, ns, nr, deviceId)
         if (!MessageDigest.isEqual(expected, Crypto.unhex(proof.getString("proof")))) {
-            if (mode == "pair") pairing.registerFailure() else trust.revoke(deviceId)
+            trust.revoke(deviceId)
             fail(out, "authentication failed")
         }
-        if (mode == "pair" && !listener.onPairRequest(sanitizeName(req.optString("name", "PC")))) {
-            fail(out, "The TV did not approve this request") // never silently approve (design system 8.2)
-        }
         send(out, Protocol.TYPE_AUTH_OK, 1, JSONObject().put("proof", Crypto.hex(Crypto.serverProof(secret, ns, nr))))
-        if (mode == "pair") {
-            trust.trust(deviceId, Crypto.deviceKey(secret, ns, nr))
-            pairing.rotate() // a code is single-use
-            listener.onPaired()
-        }
         return Crypto.MediaCipher(Crypto.sessionKey(secret, ns, nr))
     }
 

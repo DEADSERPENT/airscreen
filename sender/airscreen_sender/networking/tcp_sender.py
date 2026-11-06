@@ -22,7 +22,7 @@ class AuthError(Exception):
 
 class PairingRequired(Exception):
     def __init__(self, receiver_id: str, receiver_name: str) -> None:
-        super().__init__(f"{receiver_name} needs its pairing code")
+        super().__init__(f"{receiver_name} needs its pair key")
         self.receiver_id = receiver_id
         self.receiver_name = receiver_name
 
@@ -48,8 +48,11 @@ def _read_control(sock: socket.socket, expect: tuple[int, ...]) -> tuple[int, di
         raise AuthError("malformed handshake message") from e
 
 
-def handshake(sock: socket.socket, store: TrustStore, pairing_code: str | None) -> tuple[crypto.MediaCipher, str, dict]:
-    """Run the pairing/trust handshake. Returns (cipher, receiver_name, receiver_capabilities)."""
+def handshake(sock: socket.socket, store: TrustStore, pair_key: str | None,
+              on_verify=None) -> tuple[crypto.MediaCipher, str, dict]:
+    """Trusted TV: prove the stored key. New TV: send the pair key + a key exchange; the TV pops up Allow/Deny and both
+    screens show the same 4-digit number. Returns (cipher, receiver_name, receiver_capabilities)."""
+    import hmac
     ns = crypto.new_nonce()
     sock.sendall(pack_message(TYPE_AUTH_REQUEST, 0, 0, json.dumps(
         {"device_id": store.device_id, "name": store.device_name, "ns": ns.hex()}).encode()))
@@ -58,45 +61,57 @@ def handshake(sock: socket.socket, store: TrustStore, pairing_code: str | None) 
         raise AuthError(ch.get("reason", "receiver refused the connection"))
     nr = bytes.fromhex(ch["nr"])
     rid, rname = ch["receiver_id"], ch.get("name", "receiver")
+    caps = ch.get("caps") or {}
 
     key = store.get_key(rid)
     if key is not None and not ch.get("trusted"):
         store.revoke(rid)  # the TV forgot us (revoked or reinstalled): pair again
         key = None
-    if key is not None:
-        mode, secret = "trusted", key
-    else:
-        if not pairing_code:
-            raise PairingRequired(rid, rname)
-        try:
-            secret = crypto.normalize_code(pairing_code)
-        except ValueError as e:
-            raise AuthError(str(e)) from e
-        mode = "pair"
 
+    if key is not None:  # ---- already paired
+        sock.sendall(pack_message(TYPE_AUTH_PROOF, 1, 0, json.dumps(
+            {"mode": "trusted", "proof": crypto.client_proof(key, ns, nr, store.device_id).hex()}).encode()))
+        typ, ok = _read_control(sock, (TYPE_AUTH_OK, TYPE_AUTH_FAIL))
+        if typ == TYPE_AUTH_FAIL:
+            store.revoke(rid)
+            raise AuthError(ok.get("reason", "authentication failed"))
+        if not hmac.compare_digest(bytes.fromhex(ok["proof"]), crypto.server_proof(key, ns, nr)):
+            raise AuthError("receiver failed to prove its identity")
+        return crypto.MediaCipher(crypto.session_key(key, ns, nr)), rname, caps
+
+    # ---- new TV: pair by key, approve on the TV
+    if not pair_key:
+        raise PairingRequired(rid, rname)
+    try:
+        k = crypto.normalize_key(pair_key)
+    except ValueError as e:
+        raise AuthError(str(e)) from e
+    rpub = ch.get("rpub")
+    if not rpub:
+        raise AuthError("This TV app is too old for approval pairing. Update AirScreen on the TV.")
+    priv, pub = crypto.new_keypair()
+    shared = crypto.ecdh(priv, bytes.fromhex(rpub))
+    if on_verify:
+        on_verify(crypto.sas(shared, ns, nr))          # show the same number on the PC while the TV asks
     sock.sendall(pack_message(TYPE_AUTH_PROOF, 1, 0, json.dumps(
-        {"mode": mode, "proof": crypto.client_proof(secret, ns, nr, store.device_id).hex()}).encode()))
+        {"mode": "request", "pub": pub.hex(), "key": k}).encode()))
     typ, ok = _read_control(sock, (TYPE_AUTH_OK, TYPE_AUTH_FAIL))
     if typ == TYPE_AUTH_FAIL:
-        if mode == "trusted":
-            store.revoke(rid)
-        raise AuthError(ok.get("reason", "authentication failed") + (" (wrong pairing code?)" if mode == "pair" else ""))
-    import hmac
-    if not hmac.compare_digest(bytes.fromhex(ok["proof"]), crypto.server_proof(secret, ns, nr)):
+        raise AuthError(ok.get("reason", "the TV refused the request"))
+    if not hmac.compare_digest(bytes.fromhex(ok["proof"]), crypto.server_proof(shared, ns, nr)):
         raise AuthError("receiver failed to prove its identity")
-    if mode == "pair":
-        store.trust(rid, rname, crypto.device_key(secret, ns, nr))
-    return crypto.MediaCipher(crypto.session_key(secret, ns, nr)), rname, ch.get("caps") or {}
+    store.trust(rid, rname, crypto.device_key(shared, ns, nr))
+    return crypto.MediaCipher(crypto.session_key(shared, ns, nr)), rname, caps
 
 
 class TcpSender:
-    def __init__(self, ip: str, port: int, store: TrustStore, pairing_code: str | None = None) -> None:
+    def __init__(self, ip: str, port: int, store: TrustStore, pairing_code: str | None = None, on_verify=None) -> None:
         """Connect and authenticate. Call begin() once the stream settings are decided."""
         self._sock = socket.create_connection((ip, port), timeout=5)
         try:
             self._sock.settimeout(40)  # pairing waits for a person to press Allow on the TV
             self._sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-            self._cipher, self.receiver_name, self.caps = handshake(self._sock, store, pairing_code)
+            self._cipher, self.receiver_name, self.caps = handshake(self._sock, store, pairing_code, on_verify)
             self._sock.settimeout(10)  # streaming: a stalled receiver becomes an error instead of a hang
         except BaseException:
             self._sock.close()

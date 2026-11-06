@@ -5,7 +5,7 @@ package com.airscreen.networking
  * and after too many failed attempts (rate limiting), so it cannot be guessed online.
  */
 class PairingManager(private val onChanged: (String) -> Unit = {}) {
-    @Volatile private var code = Crypto.newPairingCode()
+    @Volatile private var code = Crypto.newPairKey()
     private var issuedAt = System.currentTimeMillis()
     private var failures = 0
     private var lockedUntil = 0L
@@ -13,7 +13,7 @@ class PairingManager(private val onChanged: (String) -> Unit = {}) {
     @Synchronized
     fun displayCode(): String {
         rotateIfExpired()
-        return Crypto.formatCode(code)
+        return Crypto.formatKey(code)
     }
 
     /** Secret to authenticate a pairing attempt, or null while locked out. */
@@ -34,10 +34,10 @@ class PairingManager(private val onChanged: (String) -> Unit = {}) {
 
     @Synchronized
     fun rotate() {
-        code = Crypto.newPairingCode()
+        code = Crypto.newPairKey()
         issuedAt = System.currentTimeMillis()
         failures = 0
-        onChanged(Crypto.formatCode(code))
+        onChanged(Crypto.formatKey(code))
     }
 
     private fun rotateIfExpired() {

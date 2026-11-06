@@ -27,8 +27,15 @@ def test_decoder_limits_resolution():
     assert (c.width, c.height, c.fps) == (1920, 1080, 30)
 
 
+def test_slow_wifi_is_conservative():
+    caps = dict(TV4K, net={"type": "wifi", "link_mbps": 144})
+    c = negotiate(caps, 2560, 1440, 60)
+    assert (c.width, c.height, c.fps) == (1920, 1080, 30)       # never 1440p40 over a 2.4 GHz link
+    assert c.bitrate_kbps <= 15_000 and any("Wi-Fi" in n for n in c.notes)
+
+
 def test_slow_link_caps_bitrate():
-    caps = dict(TV4K, net={"type": "wifi", "link_mbps": 30})
+    caps = dict(TV4K, net={"type": "ethernet", "link_mbps": 30})
     c = negotiate(caps, 1920, 1080, 60)
     assert c.bitrate_kbps == 12_000 and any("link" in n for n in c.notes)
 

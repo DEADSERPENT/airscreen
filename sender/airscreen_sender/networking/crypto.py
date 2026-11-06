@@ -82,3 +82,42 @@ class MediaCipher:
 
 
 TAG_SIZE = 16
+
+
+# ---- approval pairing (v2.1): short pair key to find the TV, P-256 ECDH for the key exchange, 4-digit number to compare ----
+from cryptography.hazmat.primitives import serialization as _ser
+from cryptography.hazmat.primitives.asymmetric import ec
+
+KEY_LENGTH = 6  # shown on the TV; it only proves the request comes from someone who can see the screen
+
+
+def new_pair_key() -> str:
+    return "".join(secrets.choice(CODE_ALPHABET) for _ in range(KEY_LENGTH))
+
+
+def format_key(key: str) -> str:
+    return f"{key[:3]}-{key[3:]}"
+
+
+def normalize_key(text: str) -> str:
+    cleaned = "".join(ch for ch in text.upper() if ch not in " -")
+    if len(cleaned) != KEY_LENGTH or any(c not in CODE_ALPHABET for c in cleaned):
+        raise ValueError("The pair key has 6 letters or digits, shown on your TV as XXX-XXX")
+    return cleaned
+
+
+def new_keypair():
+    """P-256 ephemeral key pair; the public key is the 65-byte uncompressed point (works on every Android version)."""
+    priv = ec.generate_private_key(ec.SECP256R1())
+    return priv, priv.public_key().public_bytes(_ser.Encoding.X962, _ser.PublicFormat.UncompressedPoint)
+
+
+def ecdh(priv, peer_public: bytes) -> bytes:
+    pub = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), peer_public)   # rejects points not on the curve
+    return priv.exchange(ec.ECDH(), pub)
+
+
+def sas(shared: bytes, ns: bytes, nr: bytes) -> str:
+    """4-digit number both screens show. A man in the middle ends up with two different shared secrets, so the numbers differ."""
+    h = hmac.new(shared, b"AirScreen-verify" + ns + nr, hashlib.sha256).digest()
+    return f"{int.from_bytes(h[:4], 'big') % 10000:04d}"

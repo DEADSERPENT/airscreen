@@ -44,6 +44,11 @@ def negotiate(caps: dict | None, src_w: int, src_h: int, src_refresh: int = 60) 
     max_w = min(src_w, disp.get("w") or src_w)
     max_h = min(src_h, disp.get("h") or src_h)
     refresh = min(src_refresh, int(disp.get("refresh") or src_refresh), 60)
+    net = caps.get("net") or {}
+    wifi_slow = net.get("type") == "wifi" and (net.get("link_mbps") or 0) < 400
+    if wifi_slow:  # real Wi-Fi throughput is a fraction of the PHY rate; stay at 1080p30 so the stream never stutters
+        max_w, max_h, refresh = min(max_w, 1920), min(max_h, 1080), min(refresh, 30)
+        notes.append("slow Wi-Fi link: using 1080p at 30 fps (Ethernet or 5 GHz allows more)")
 
     pipe_fps = int(MAX_PIPE_MBYTES_PER_S * 1e6 / (src_w * src_h * 4))
     candidates = []
@@ -65,7 +70,7 @@ def negotiate(caps: dict | None, src_w: int, src_h: int, src_refresh: int = 60) 
     kbps = max(MIN_KBPS, min(MAX_KBPS, kbps))
     link = (caps.get("net") or {}).get("link_mbps")
     if link:
-        budget = int(link * 1000 * LINK_SHARE)
+        budget = int(link * 1000 * (0.10 if wifi_slow else LINK_SHARE))   # plan on ~10% of a slow Wi-Fi PHY rate
         if budget < kbps:
             kbps = max(MIN_KBPS, budget)
             notes.append(f"bitrate limited by {link} Mbit/s link")

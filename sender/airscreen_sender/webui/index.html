@@ -56,7 +56,8 @@
           <div class="menu" id="devmenu" role="listbox" aria-label="TVs" hidden>
             <div class="menu-head"><span id="scanstate">TVs on your network</span><button id="scanbtn" class="btn tertiary sm">Scan again</button></div>
             <div id="devlist"></div>
-            <div class="manual"><label class="sr" for="manualip">TV address</label><input id="manualip" placeholder="Enter an address, e.g. 192.168.1.2" inputmode="decimal" spellcheck="false" autocomplete="off"><button id="manualuse" class="btn secondary sm">Use address</button></div>
+            <div class="manual"><label class="sr" for="keyinput">Pair key</label><input id="keyinput" placeholder="Enter the pair key shown on your TV" spellcheck="false" autocomplete="off" maxlength="8"><button id="keyuse" class="btn secondary sm">Pair</button></div>
+            <details class="adv"><summary>Connect by IP address instead</summary><div class="manual"><label class="sr" for="manualip">TV address</label><input id="manualip" placeholder="e.g. 192.168.1.2" inputmode="decimal" spellcheck="false" autocomplete="off"><button id="manualuse" class="btn secondary sm">Use address</button></div></details>
           </div>
         </div>
 
@@ -189,12 +190,22 @@
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="pairtitle" aria-describedby="pairdesc">
     <img class="i3d lg" src="icons/icon-security-shield@128.png" alt="">
     <h2 id="pairtitle">Pair with <span id="pairname">your TV</span></h2>
-    <p class="sub" id="pairdesc">Pairing makes this TV trusted so future connections are quick and encrypted. Enter the 16-character code shown on the TV. You only do this once.</p>
+    <p class="sub" id="pairdesc">Pairing makes this TV trusted so future connections are quick and encrypted. Enter the pair key shown on the TV, then approve on the TV. You only do this once.</p>
     <div class="codeboxes" id="codeboxes" role="group" aria-label="Pairing code">
-      <input maxlength="4" autocomplete="off" spellcheck="false" aria-label="Code characters 1 to 4"><input maxlength="4" autocomplete="off" spellcheck="false" aria-label="Code characters 5 to 8"><input maxlength="4" autocomplete="off" spellcheck="false" aria-label="Code characters 9 to 12"><input maxlength="4" autocomplete="off" spellcheck="false" aria-label="Code characters 13 to 16">
-    </div>
+      <input maxlength="3" autocomplete="off" spellcheck="false" aria-label="Pair key, first 3 characters"><input maxlength="3" autocomplete="off" spellcheck="false" aria-label="Pair key, last 3 characters"></div>
     <div class="err" id="pairerr" role="alert"></div>
     <div class="actions"><button class="btn tertiary" id="paircancel">Cancel</button><button class="btn primary" id="pairgo">Pair and connect</button></div>
+  </div>
+</div>
+
+<!-- waiting for the person at the TV: both screens show the same number -->
+<div class="modal" id="waitmodal" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="waittitle">
+    <img class="i3d lg" src="icons/icon-device-tv@128.png" alt="">
+    <h2 id="waittitle">Approve on your TV</h2>
+    <p class="sub">Your TV is asking to allow this PC. Choose <b>Allow</b> only if it shows this number.</p>
+    <div class="bigcode" id="waitcode" aria-live="polite">····</div>
+    <div class="actions"><button class="btn tertiary" id="waitcancel">Cancel</button></div>
   </div>
 </div>
 

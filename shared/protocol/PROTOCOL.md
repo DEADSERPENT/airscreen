@@ -25,15 +25,18 @@ Handshake messages are plaintext and use their own seq (0,1). After AUTH_OK, typ
 seq restarts at 0.
 
 ## Security
-- **Pairing (first time):** the TV shows a 16-character code (80 bits, single use, expires in 10 min, 5 wrong
-  attempts lock pairing for 30 s and rotate the code). It is never transmitted. Sender and receiver prove knowledge with
-  `HMAC-SHA256(code, "AirScreen-client"||ns||nr||device_id)` / `("AirScreen-server"||ns||nr)`, then both derive and store
-  `device_key = HKDF(code, salt=ns||nr, info="AirScreen-device-key")`.
-- **Trusted devices:** later sessions use `device_key` instead of the code (`mode:"trusted"`). The TV can forget all
-  senders (Menu key); a sender that is no longer trusted is told to pair again.
+- **Pairing (first time), approval-based:** the TV shows a short **pair key** (6 characters, shown as `XXX-XXX`, single use,
+  expires after 10 min, 5 wrong tries lock pairing for 30 s). The PC sends the key plus an ephemeral **P-256 ECDH** public key
+  (`AUTH_PROOF {mode:"request", pub, key}`); the TV's challenge carries its own ephemeral key (`rpub`). Both sides derive the
+  shared secret and a **4-digit verification number** `HMAC(shared, "AirScreen-verify"||ns||nr)`. The TV immediately pops up
+  Allow / Deny showing the PC's name and the number; the PC shows the same number. A man in the middle ends up with two
+  different secrets, so the numbers differ and the person presses Deny. Never silent: a timeout is a denial.
+  The pair key only proves the request comes from someone who can see the TV; the security is the approval + number.
+- **Trusted devices:** after approval both sides store `device_key = HKDF(shared, ns||nr, "AirScreen-device-key")`.
+  Later sessions use `AUTH_PROOF {mode:"trusted"}` with HMAC over fresh nonces; no key, no prompt.
 - **Media:** `session_key = HKDF(key, salt=ns||nr, info="AirScreen-session")`; payload = AES-256-GCM(plaintext),
   nonce = 8 zero bytes || seq(u32), AAD = the 24-byte header (length = ciphertext length incl. 16-byte tag).
-- Test vectors: `shared/test-data/crypto_vectors.json` (checked by Python and Kotlin unit tests).
+- Test vectors: `shared/test-data/crypto_vectors.json` (HMAC/HKDF/AES-GCM, checked by Python and Kotlin unit tests).
 
 ## Capabilities (`caps`, TV -> sender) and automatic quality
 `{"video":{"modes":[{"w","h","fps"}...]},"display":{"w","h","refresh"},"net":{"type","link_mbps"},"audio":{...}}`.

@@ -117,6 +117,7 @@ class Api:
             "paired": [{"id": rid, "name": n} for rid, n in self.store.receivers().items()],
             "settings": self.settings, "muted": self.muted, "ssid": self._wifi_ssid(),
             "pc_name": self.store.device_name,
+            "verify": (self.session.verify_code if self.session else ""),
         }
 
     def _wifi_ssid(self) -> str:
@@ -193,6 +194,41 @@ class Api:
         self.session = StreamSession(cfg, self._on_status, self.store, (code or "").strip() or None)
         self.session.set_muted(self.muted)
         self.session.start()
+        return {"ok": True}
+
+    def connect_by_key(self, key: str) -> dict:
+        """The user typed the pair key shown on the TV: find the TV on the network and pair with it."""
+        if self.session and self.session.running:
+            return {"ok": False, "error": "Already streaming"}
+        from .networking import crypto
+        try:
+            k = crypto.normalize_key(key)
+            cfg = self._build_config("", 5000)
+        except (ValueError, ConfigError) as e:
+            return {"ok": False, "error": str(e)}
+        self.history.clear()
+        self.pairing_for = ""
+        self.phase, self.status = "connecting", "Looking for your TV…"
+        self.log("Looking for a TV that shows this pair key")
+
+        def work() -> None:
+            try:
+                from .networking.discovery import discover
+                found = discover(2.5)
+            except Exception as e:
+                found = []
+                self.log(f"Discovery failed: {e}")
+            if not found:
+                self.phase, self.status = "error", "No TV found on your network. Open AirScreen on the TV, or connect by IP address."
+                return
+            cfg.receiver_ip, cfg.receiver_port = found[0].ip, found[0].port
+            s = StreamSession(cfg, self._on_status, self.store, k)
+            s.candidates = [(r.ip, r.port) for r in found]
+            s.set_muted(self.muted)
+            self.session = s
+            s.start()
+
+        threading.Thread(target=work, daemon=True).start()
         return {"ok": True}
 
     def disconnect(self) -> None:

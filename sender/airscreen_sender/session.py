@@ -31,6 +31,8 @@ class StreamSession:
         self._status = on_status
         self.store = store or TrustStore()
         self.pairing_code = pairing_code
+        self.candidates: list[tuple[str, int]] | None = None   # TVs to try when the user typed only a pair key
+        self.verify_code = ""
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self.stats: dict[str, float] = {}
@@ -51,6 +53,10 @@ class StreamSession:
     @property
     def running(self) -> bool:
         return bool(self._thread and self._thread.is_alive())
+
+    def _on_verify(self, code: str) -> None:
+        self.verify_code = code
+        self._status(f"Confirm code {code} on your TV")
 
     def set_muted(self, muted: bool) -> None:
         self.muted = muted
@@ -126,12 +132,25 @@ class StreamSession:
                 else:
                     speakers = None
 
-            try:
-                net = TcpSender(cfg.receiver_ip, cfg.receiver_port, self.store, self.pairing_code)
-            except (PairingRequired, AuthError):
-                raise
-            except OSError as e:
-                raise Transient(f"Cannot reach receiver ({e})") from e
+            targets = self.candidates or [(cfg.receiver_ip, cfg.receiver_port)]
+            net = None
+            for i, (ip, port) in enumerate(targets):
+                last = i == len(targets) - 1
+                try:
+                    net = TcpSender(ip, port, self.store, self.pairing_code, self._on_verify)
+                    self.candidates = [(ip, port)]          # remember which TV owns this key
+                    break
+                except PairingRequired:
+                    raise
+                except AuthError as e:
+                    if not last and "pair key" in str(e):
+                        continue                            # another TV on the network owns this key
+                    raise
+                except OSError as e:
+                    if not last:
+                        continue
+                    raise Transient(f"Cannot reach receiver ({e})") from e
+            self.verify_code = ""
 
             if cfg.auto_quality:
                 ch = negotiate(net.caps, capture.width, capture.height)

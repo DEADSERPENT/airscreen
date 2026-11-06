@@ -222,3 +222,8 @@ input::placeholder{color:var(--ink3)}
 .btn.primary.orb.needs-tv{opacity:.7;box-shadow:0 0 0 10px rgba(255,255,255,.03),0 28px 64px rgba(0,0,0,.65)}
 .btn.primary.orb.needs-tv:hover:not(:disabled){opacity:1}
 .kv small{font-size:12px}
+
+/* approval pairing */
+.bigcode{font:700 52px/1 var(--font);letter-spacing:.28em;margin:22px 0 4px;padding-left:.28em}
+.codeboxes input{width:104px}
+.adv{margin-top:10px;color:var(--ink2);font-size:12px}.adv summary{cursor:pointer;padding:4px 8px}

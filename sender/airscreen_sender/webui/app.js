@@ -49,6 +49,9 @@ function friendly(st, phase, name) {
   if (phase === "reconnecting") return "Connection interrupted. Reconnecting…";
   if (phase === "pairing") return "Pairing required";
   if (phase === "error") {
+    if (/pair key|wrong key/i.test(st)) return "That pair key didn’t match. Check the key on your TV and try again.";
+    if (/did not approve|denied/i.test(st)) return "The TV denied the request.";
+    if (/No TV found/i.test(st)) return "No TV found on your network. Open AirScreen on the TV, or connect by IP address.";
     if (/Cannot reach receiver|refused|timed out|10061|10060|unreachable/i.test(st)) return "Can’t reach your TV. Check that both devices are on the same network and the AirScreen app is open on the TV.";
     if (/Authentication failed|pairing code|wrong pairing/i.test(st)) return "Pairing didn’t work. Check the code on your TV and try again.";
     if (/NVENC/i.test(st)) return "Hardware video encoding isn’t available. Run diagnostics in About.";
@@ -71,6 +74,18 @@ document.addEventListener("click", e => { if (!e.target.closest(".device-wrap"))
 $("#scanbtn").addEventListener("click", () => { api().scan(); schedule(0); });
 $("#scanbtn2").addEventListener("click", () => { api().scan(); schedule(0); });
 $("#manualuse").addEventListener("click", useManual);
+$("#keyuse").addEventListener("click", useKey);
+$("#keyinput").addEventListener("keydown", e => { if (e.key === "Enter") useKey(); });
+async function useKey() {
+  const k = $("#keyinput").value.replace(/[^A-Za-z0-9]/g, "");
+  if (k.length !== 6) { showErr("The pair key has 6 characters, shown on your TV as XXX-XXX."); return; }
+  showErr(""); toggleMenu(false); pairTrigger = $("#cta");
+  codeSubmitted = true;
+  const r = await api().connect_by_key(k);
+  if (!r.ok) showErr(r.error);
+  $("#keyinput").value = "";
+  schedule(0);
+}
 $("#manualip").addEventListener("keydown", e => { if (e.key === "Enter") useManual(); });
 function useManual() {
   const ip = $("#manualip").value.trim();
@@ -113,11 +128,11 @@ $("#mutebtn").addEventListener("click", async () => { await api().set_muted(!S.m
 /* ---------- pairing dialog (6.5): focus enters and returns; Esc dismisses ---------- */
 const boxes = $$("#codeboxes input");
 boxes.forEach((b, i) => {
-  b.addEventListener("input", () => { b.value = b.value.toUpperCase().replace(/[^A-Z0-9]/g, ""); if (b.value.length === 4 && i < 3) boxes[i + 1].focus(); });
+  b.addEventListener("input", () => { b.value = b.value.toUpperCase().replace(/[^A-Z0-9]/g, ""); if (b.value.length === 3 && i < boxes.length - 1) boxes[i + 1].focus(); });
   b.addEventListener("keydown", e => { if (e.key === "Backspace" && !b.value && i > 0) boxes[i - 1].focus(); if (e.key === "Enter") submitPair(); });
   b.addEventListener("paste", e => {
     const t = (e.clipboardData.getData("text") || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-    if (t.length >= 8) { e.preventDefault(); boxes.forEach((x, k) => x.value = t.slice(k * 4, k * 4 + 4)); boxes[Math.min(3, Math.floor(t.length / 4))].focus(); }
+    if (t.length >= 4) { e.preventDefault(); boxes.forEach((x, k) => x.value = t.slice(k * 3, k * 3 + 3)); boxes[Math.min(boxes.length - 1, Math.floor(t.length / 3))].focus(); }
   });
 });
 function openPair(name, err) {
@@ -131,7 +146,7 @@ function closePair(restoreFocus = true) {
 }
 async function submitPair() {
   const code = boxes.map(b => b.value).join("");
-  if (code.length !== 16) { $("#pairerr").textContent = "The code has 16 characters, in 4 groups of 4."; return; }
+  if (code.length !== 6) { $("#pairerr").textContent = "The pair key has 6 characters, shown on your TV as XXX-XXX."; return; }
   codeSubmitted = true; closePair();
   const r = await api().connect(target.ip, target.port, code);
   if (!r.ok) showErr(r.error);
@@ -144,6 +159,12 @@ document.addEventListener("keydown", e => {
   if (e.key !== "Escape") return;
   if (pairOpen) cancelPair(); else if (!menu.hidden) { toggleMenu(false); card.focus(); }
 });
+
+/* ---------- waiting for approval on the TV (both screens show the same number) ---------- */
+let waitOpen = false;
+function openWait(code) { $("#waitmodal").hidden = false; waitOpen = true; }
+function closeWait() { $("#waitmodal").hidden = true; waitOpen = false; }
+$("#waitcancel").addEventListener("click", async () => { closeWait(); await api().disconnect(); schedule(0); });
 
 /* ---------- render ---------- */
 let lastPhase = "idle";
@@ -195,6 +216,10 @@ function render() {
   if (ph === "pairing" && !pairOpen) { codeSubmitted = false; openPair(S.pairing_for, ""); }
   if (ph === "error" && codeSubmitted && !pairOpen) { codeSubmitted = false; openPair(target ? target.name : "", friendly(S.status, ph)); }
   if (ph === "streaming") codeSubmitted = false;
+
+  const waiting = !!S.verify && ph === "connecting";
+  if (waiting) { setText("waitcode", S.verify.split("").join(" ")); if (!waitOpen) openWait(S.verify); }
+  else if (waitOpen) closeWait();
 
   // transitions -> toasts (non-blocking), disconnect remains persistent in the Streaming view
   if (lastPhase !== ph) {
