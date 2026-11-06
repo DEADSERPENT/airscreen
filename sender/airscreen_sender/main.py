@@ -21,6 +21,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--bitrate", type=int, help="kbit/s")
     p.add_argument("--ffmpeg", help="path to ffmpeg.exe")
     p.add_argument("--allow-cpu", action="store_true", help="permit libx264 (CPU) instead of NVENC; never automatic")
+    p.add_argument("--code", help="pairing code shown on the TV (first connection only)")
+    p.add_argument("--no-audio", action="store_true")
+    p.add_argument("--no-cursor", action="store_true")
+    p.add_argument("--no-reconnect", action="store_true")
+    p.add_argument("--discover", action="store_true", help="list receivers found via mDNS and exit")
+    p.add_argument("--forget", metavar="RECEIVER_ID", help="revoke trust for a paired receiver and exit")
     p.add_argument("--preflight", action="store_true", help="run hardware/network checks and exit")
     return p
 
@@ -42,12 +48,20 @@ def config_from_args(a: argparse.Namespace) -> Config:
                 cfg.width, cfg.height = int(w), int(h)
             except ValueError:
                 raise ConfigError(f"--size must be WxH or 'source', got {a.size!r}")
+    if a.size or a.fps or a.bitrate:
+        cfg.auto_quality = False  # any explicit quality flag means manual mode
     if a.fps:
         cfg.fps = a.fps
     if a.bitrate:
         cfg.bitrate_kbps = a.bitrate
     if a.ffmpeg:
         cfg.ffmpeg_path = a.ffmpeg
+    if a.no_audio:
+        cfg.audio = False
+    if a.no_cursor:
+        cfg.cursor = False
+    if a.no_reconnect:
+        cfg.reconnect = False
     if a.allow_cpu:
         cfg.allow_cpu_fallback = True
         cfg.encoder = "libx264"
@@ -58,6 +72,19 @@ def main(argv: list[str] | None = None) -> int:
     a = build_parser().parse_args(argv)
     try:
         cfg = config_from_args(a)
+        if a.discover:
+            from .networking.discovery import discover
+            found = discover()
+            for r in found:
+                print(f"{r.name}	{r.ip}:{r.port}	id={r.receiver_id}")
+            if not found:
+                print("no receivers found (is the TV app open? same network?)")
+            return 0 if found else 1
+        if a.forget:
+            from .networking.trust_store import TrustStore
+            TrustStore().revoke(a.forget)
+            print(f"revoked {a.forget}")
+            return 0
         if a.preflight:
             bad = 0
             for c in preflight.run_all(cfg.ffmpeg_path, cfg.receiver_ip, cfg.receiver_port):
@@ -73,16 +100,24 @@ def main(argv: list[str] | None = None) -> int:
         print(f"config error: {e}", file=sys.stderr)
         return 2
 
-    session = StreamSession(cfg, on_status=lambda s: print(s, flush=True))
-    session.start()
-    try:
-        while session.running:
-            time.sleep(1)
-            if session.stats:
-                s = session.stats
-                print(f"  in {s['fps_in']:.1f} fps | {s['mbps']:.1f} Mbit/s | dropped {int(s['dropped'])}", flush=True)
-    except KeyboardInterrupt:
-        print("stopping...")
-    finally:
-        session.stop()
-    return 1 if session.error else 0
+    code = a.code
+    while True:
+        session = StreamSession(cfg, on_status=lambda s: print(s, flush=True), pairing_code=code)
+        session.start()
+        try:
+            while session.running:
+                time.sleep(1)
+                if session.stats:
+                    s = session.stats
+                    print(f"  in {s['fps_in']:.1f} fps | {s['mbps']:.1f} Mbit/s | dropped {int(s['dropped'])}"
+                          f" | audio pkts {int(s['audio_packets'])}", flush=True)
+        except KeyboardInterrupt:
+            print("stopping...")
+            session.stop()
+            return 0
+        finally:
+            session.stop()
+        if session.pairing_required and sys.stdin.isatty() and not code:
+            code = input("Pairing code from the TV (XXXX-XXXX-XXXX-XXXX): ").strip()
+            continue
+        return 1 if session.error else 0

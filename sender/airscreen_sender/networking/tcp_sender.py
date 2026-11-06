@@ -1,79 +1,177 @@
-"""TCP sender with a bounded queue. Drops to the next keyframe when the network falls behind."""
+"""Authenticated, encrypted TCP sender with a bounded queue (drops to the next keyframe when behind)."""
 from __future__ import annotations
 
+import json
 import queue
 import socket
 import threading
 import time
 
-from .protocol import (FLAG_KEYFRAME, TYPE_BYE, TYPE_HELLO, TYPE_VIDEO, hello_payload, pack_message)
+from . import crypto
+from .protocol import (FLAG_KEYFRAME, HEADER_SIZE, TYPE_AUDIO, TYPE_AUTH_CHALLENGE, TYPE_AUTH_FAIL, TYPE_AUTH_OK,
+                       TYPE_AUTH_PROOF, TYPE_AUTH_REQUEST, TYPE_BYE, TYPE_HELLO, TYPE_VIDEO, ProtocolError,
+                       hello_payload, pack_header, pack_message, parse_header)
+from .trust_store import TrustStore
 
-QUEUE_LIMIT = 30  # ~1 s at 30 fps
+BEHIND_LIMIT = 40  # queued messages (~0.5 s of video+audio) before we declare the network behind
+
+
+class AuthError(Exception):
+    pass
+
+
+class PairingRequired(Exception):
+    def __init__(self, receiver_id: str, receiver_name: str) -> None:
+        super().__init__(f"{receiver_name} needs its pairing code")
+        self.receiver_id = receiver_id
+        self.receiver_name = receiver_name
+
+
+def _recv_exact(sock: socket.socket, n: int) -> bytes:
+    buf = bytearray()
+    while len(buf) < n:
+        chunk = sock.recv(n - len(buf))
+        if not chunk:
+            raise ConnectionError("receiver closed the connection")
+        buf += chunk
+    return bytes(buf)
+
+
+def _read_control(sock: socket.socket, expect: tuple[int, ...]) -> tuple[int, dict]:
+    h = parse_header(_recv_exact(sock, HEADER_SIZE))
+    payload = _recv_exact(sock, h.length)
+    if h.type not in expect:
+        raise AuthError(f"unexpected message type {h.type} during handshake")
+    try:
+        return h.type, json.loads(payload) if payload else {}
+    except json.JSONDecodeError as e:
+        raise AuthError("malformed handshake message") from e
+
+
+def handshake(sock: socket.socket, store: TrustStore, pairing_code: str | None) -> tuple[crypto.MediaCipher, str, dict]:
+    """Run the pairing/trust handshake. Returns (cipher, receiver_name, receiver_capabilities)."""
+    ns = crypto.new_nonce()
+    sock.sendall(pack_message(TYPE_AUTH_REQUEST, 0, 0, json.dumps(
+        {"device_id": store.device_id, "name": store.device_name, "ns": ns.hex()}).encode()))
+    typ, ch = _read_control(sock, (TYPE_AUTH_CHALLENGE, TYPE_AUTH_FAIL))
+    if typ == TYPE_AUTH_FAIL:
+        raise AuthError(ch.get("reason", "receiver refused the connection"))
+    nr = bytes.fromhex(ch["nr"])
+    rid, rname = ch["receiver_id"], ch.get("name", "receiver")
+
+    key = store.get_key(rid)
+    if key is not None and not ch.get("trusted"):
+        store.revoke(rid)  # the TV forgot us (revoked or reinstalled): pair again
+        key = None
+    if key is not None:
+        mode, secret = "trusted", key
+    else:
+        if not pairing_code:
+            raise PairingRequired(rid, rname)
+        try:
+            secret = crypto.normalize_code(pairing_code)
+        except ValueError as e:
+            raise AuthError(str(e)) from e
+        mode = "pair"
+
+    sock.sendall(pack_message(TYPE_AUTH_PROOF, 1, 0, json.dumps(
+        {"mode": mode, "proof": crypto.client_proof(secret, ns, nr, store.device_id).hex()}).encode()))
+    typ, ok = _read_control(sock, (TYPE_AUTH_OK, TYPE_AUTH_FAIL))
+    if typ == TYPE_AUTH_FAIL:
+        if mode == "trusted":
+            store.revoke(rid)
+        raise AuthError(ok.get("reason", "authentication failed") + (" (wrong pairing code?)" if mode == "pair" else ""))
+    import hmac
+    if not hmac.compare_digest(bytes.fromhex(ok["proof"]), crypto.server_proof(secret, ns, nr)):
+        raise AuthError("receiver failed to prove its identity")
+    if mode == "pair":
+        store.trust(rid, rname, crypto.device_key(secret, ns, nr))
+    return crypto.MediaCipher(crypto.session_key(secret, ns, nr)), rname, ch.get("caps") or {}
 
 
 class TcpSender:
-    def __init__(self, ip: str, port: int, width: int, height: int, fps: int) -> None:
+    def __init__(self, ip: str, port: int, store: TrustStore, pairing_code: str | None = None) -> None:
+        """Connect and authenticate. Call begin() once the stream settings are decided."""
         self._sock = socket.create_connection((ip, port), timeout=5)
-        self._sock.settimeout(10)  # a stalled receiver surfaces as an error instead of hanging
-        self._sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        self._q: queue.Queue[bytes | None] = queue.Queue(maxsize=QUEUE_LIMIT)
-        self._seq = 0
+        try:
+            self._sock.settimeout(10)  # stalled receiver -> error instead of hanging
+            self._sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            self._cipher, self.receiver_name, self.caps = handshake(self._sock, store, pairing_code)
+        except BaseException:
+            self._sock.close()
+            raise
+        self._q: queue.Queue = queue.Queue()
+        self._seq = 0  # touched only by the send thread (and begin() before it starts)
         self._t0 = time.monotonic()
-        self._need_key = True       # start (and resume after drops) on a keyframe
+        self._need_key = True  # start (and resume after drops) on a keyframe
         self.dropped = 0
         self.sent_bytes = 0
         self.error: Exception | None = None
-        self._send_raw(pack_message(TYPE_HELLO, self._next_seq(), 0, hello_payload(width, height, fps)))
-        self._thread = threading.Thread(target=self._run, daemon=True)
+
+    def begin(self, width: int, height: int, fps: int, audio_info: dict | None = None) -> None:
+        self._send(TYPE_HELLO, 0, 0, hello_payload(width, height, fps, audio_info))
+        self._thread = threading.Thread(target=self._run, name="net-send", daemon=True)
         self._thread.start()
 
-    def _next_seq(self) -> int:
-        s = self._seq
-        self._seq += 1
-        return s
+    # --- producer side (encoder / audio threads); never blocks ---
+    def _pts(self) -> int:
+        return int((time.monotonic() - self._t0) * 1_000_000)
 
-    def _send_raw(self, data: bytes) -> None:
-        self._sock.sendall(data)
-        self.sent_bytes += len(data)
-
-    def submit(self, au: bytes, keyframe: bool) -> None:
-        """Called from the encoder thread. Never blocks."""
+    def submit_video(self, au: bytes, keyframe: bool) -> None:
         if self.error:
-            return  # session loop notices net.error and shuts down
+            return
         if self._need_key and not keyframe:
             self.dropped += 1
             return
-        pts_us = int((time.monotonic() - self._t0) * 1_000_000)
-        msg = pack_message(TYPE_VIDEO, self._next_seq(), pts_us, au, FLAG_KEYFRAME if keyframe else 0)
-        try:
-            self._q.put_nowait(msg)
-            self._need_key = False
-        except queue.Full:
-            # Network is behind: flush stale data and wait for the next keyframe.
-            self.dropped += self._q.qsize() + 1
+        if self._q.qsize() >= BEHIND_LIMIT:
+            # Network is behind: discard stale video, keep audio, resume at next keyframe.
+            keep = []
             while True:
                 try:
-                    self._q.get_nowait()
+                    item = self._q.get_nowait()
                 except queue.Empty:
                     break
+                if item is not None and item[0] == TYPE_AUDIO:
+                    keep.append(item)
+                else:
+                    self.dropped += 1
+            for item in keep:
+                self._q.put(item)
+            self.dropped += 1
             self._need_key = True
+            return
+        self._need_key = False
+        self._q.put((TYPE_VIDEO, FLAG_KEYFRAME if keyframe else 0, self._pts(), au))
+
+    def submit_audio(self, packet: bytes) -> None:
+        if not self.error:
+            self._q.put((TYPE_AUDIO, 0, self._pts(), packet))
+
+    # --- send thread ---
+    def _send(self, msg_type: int, flags: int, pts_us: int, payload: bytes) -> None:
+        seq = self._seq
+        self._seq += 1
+        header = pack_header(msg_type, seq, pts_us, len(payload) + crypto.TAG_SIZE, flags)
+        data = header + self._cipher.seal(seq, payload, header)
+        self._sock.sendall(data)
+        self.sent_bytes += len(data)
 
     def _run(self) -> None:
         try:
             while True:
-                msg = self._q.get()
-                if msg is None:
+                item = self._q.get()
+                if item is None:
                     return
-                self._send_raw(msg)
+                self._send(*item)
         except Exception as e:  # connection lost / timed out
             self.error = e
 
     def close(self) -> None:
         try:
-            if not self.error:
-                self._q.put(None, timeout=1)
+            if not self.error and getattr(self, "_thread", None):
+                self._q.put(None)
                 self._thread.join(timeout=3)
-                self._send_raw(pack_message(TYPE_BYE, self._next_seq(), 0))
+                self._send(TYPE_BYE, 0, 0, b"")
         except Exception:
             pass
         finally:

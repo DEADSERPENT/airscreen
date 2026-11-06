@@ -63,7 +63,7 @@ class VideoDecoder(
                 dropUntilKeyframe()
                 return
             }
-            buf.clear()
+            (buf as java.nio.Buffer).clear() // Buffer cast: avoids NoSuchMethodError on Android < 13
             buf.put(data)
             codec.queueInputBuffer(index, 0, data.size, ptsUs, 0)
         } catch (e: IllegalStateException) {

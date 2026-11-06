@@ -1,0 +1,14 @@
+{
+  "ns": "01010101010101010101010101010101",
+  "nr": "02020202020202020202020202020202",
+  "secret_ascii": "ABCDEFGHJKLMNPQR",
+  "device_id": "dev1",
+  "client_proof": "9cd6c2b0f2fb4cb6df6fca3585985f6c03cbd88a37a6f1ac32048bf18b89deb2",
+  "server_proof": "e783e16e9bf464acce65cfab9c3774a6981da21afbaa12e560548c1ee9c1f83d",
+  "device_key": "aa6a23df96dd4158a3df113dab6d38ca664319585b07470671ec5709db3a3724",
+  "session_key": "6ad6927b32fc6ebcc39e1049c7a99fb338cb3cc44306ffd90ca39582b0a78db1",
+  "gcm_seq": 5,
+  "gcm_aad_hex": "6865616465722d6279746573",
+  "gcm_plain_hex": "68656c6c6f2061697273637265656e",
+  "gcm_sealed_hex": "85d964cf053a612d456149e5ddb951cc87db78c73cc698044df0303e6b2808"
+}

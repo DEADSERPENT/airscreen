@@ -52,10 +52,19 @@
             android:textSize="22sp" />
 
         <TextView
+            android:id="@+id/pairing"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:textColor="#2F80ED"
+            android:textSize="30sp"
+            android:textStyle="bold" />
+
+        <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="48dp"
-            android:text="Enter this address in AirScreen on your PC. Press Back to disconnect."
+            android:text="Pick this TV in AirScreen on your PC. First time: enter the pairing code. Back = disconnect, Menu = forget all paired PCs."
             android:textColor="#5F7388"
             android:textSize="18sp" />
     </LinearLayout>

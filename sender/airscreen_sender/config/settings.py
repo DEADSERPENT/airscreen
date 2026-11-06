@@ -15,10 +15,15 @@ class Config:
     receiver_ip: str = ""
     receiver_port: int = 5000
     monitor: int = 0            # output index on the capture device
+    auto_quality: bool = True   # negotiate the best resolution/fps/bitrate with the receiver
     width: int = 1920           # encoded size; 0 = same as source
     height: int = 1080
     fps: int = 30
     bitrate_kbps: int = 12000
+    cursor: bool = True
+    audio: bool = True
+    audio_bitrate_kbps: int = 192
+    reconnect: bool = True      # keep retrying after a network interruption
     ffmpeg_path: str = "ffmpeg"
     encoder: str = "h264_nvenc"
     allow_cpu_fallback: bool = False  # never fall back to CPU encoding silently
@@ -37,6 +42,8 @@ class Config:
                 raise ConfigError("width and height must be even for H.264 4:2:0")
         if not (100 <= self.bitrate_kbps <= 500_000):
             raise ConfigError(f"bitrate_kbps out of range: {self.bitrate_kbps}")
+        if not (32 <= self.audio_bitrate_kbps <= 510):
+            raise ConfigError(f"audio_bitrate_kbps out of range: {self.audio_bitrate_kbps}")
         if self.encoder not in ("h264_nvenc", "libx264"):
             raise ConfigError(f"unsupported encoder: {self.encoder}")
         if self.encoder == "libx264" and not self.allow_cpu_fallback:

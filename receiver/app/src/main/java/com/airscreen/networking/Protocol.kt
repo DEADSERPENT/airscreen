@@ -3,16 +3,22 @@ package com.airscreen.networking
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-/** AirScreen wire protocol v1 - see shared/protocol/PROTOCOL.md. */
+/** AirScreen wire protocol v2 - see shared/protocol/PROTOCOL.md. */
 object Protocol {
     const val HEADER_SIZE = 24
-    const val VERSION = 1
+    const val VERSION = 2
     const val MAX_PAYLOAD = 8 * 1024 * 1024
-    const val MAX_HELLO_PAYLOAD = 4096
+    const val MAX_CONTROL_PAYLOAD = 4096
 
     const val TYPE_HELLO = 1
     const val TYPE_VIDEO = 2
     const val TYPE_BYE = 3
+    const val TYPE_AUDIO = 4
+    const val TYPE_AUTH_REQUEST = 5
+    const val TYPE_AUTH_CHALLENGE = 6
+    const val TYPE_AUTH_PROOF = 7
+    const val TYPE_AUTH_OK = 8
+    const val TYPE_AUTH_FAIL = 9
 
     const val FLAG_KEYFRAME = 0x01
 
@@ -22,6 +28,13 @@ object Protocol {
 
     data class Header(val type: Int, val flags: Int, val seq: Long, val ptsUs: Long, val length: Int) {
         val keyframe: Boolean get() = flags and FLAG_KEYFRAME != 0
+    }
+
+    fun buildHeader(type: Int, seq: Long, ptsUs: Long, length: Int, flags: Int = 0): ByteArray {
+        val buf = ByteBuffer.allocate(HEADER_SIZE).order(ByteOrder.BIG_ENDIAN)
+        buf.put(MAGIC).put(VERSION.toByte()).put(type.toByte()).put(flags.toByte()).put(0)
+        buf.putInt((seq and 0xFFFFFFFFL).toInt()).putLong(ptsUs).putInt(length)
+        return buf.array()
     }
 
     /** Parses and validates a header. Throws [ProtocolException] on anything malformed. */
@@ -36,12 +49,11 @@ object Protocol {
         val ptsUs = buf.getLong(12)
         val length = buf.getInt(20)
 
-        if (version != VERSION) throw ProtocolException("unsupported version $version")
-        if (type != TYPE_HELLO && type != TYPE_VIDEO && type != TYPE_BYE) throw ProtocolException("unknown type $type")
+        if (version != VERSION) throw ProtocolException("unsupported version $version (update AirScreen on both devices)")
+        if (type !in TYPE_HELLO..TYPE_AUTH_FAIL) throw ProtocolException("unknown type $type")
         if (ptsUs < 0) throw ProtocolException("bad timestamp")
         if (length < 0 || length > MAX_PAYLOAD) throw ProtocolException("bad payload length $length")
-        if (type == TYPE_HELLO && length > MAX_HELLO_PAYLOAD) throw ProtocolException("hello too large")
-        if (type == TYPE_BYE && length != 0) throw ProtocolException("bye must be empty")
+        if (type >= TYPE_AUTH_REQUEST && length > MAX_CONTROL_PAYLOAD) throw ProtocolException("control payload too large")
         return Header(type, flags, seq, ptsUs, length)
     }
 }

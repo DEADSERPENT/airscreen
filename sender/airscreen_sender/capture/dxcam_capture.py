@@ -8,17 +8,30 @@ import numpy as np
 
 
 class DesktopCapture:
-    def __init__(self, monitor: int = 0) -> None:
+    def __init__(self, monitor: int = 0, cursor: bool = True) -> None:
         self._cam = dxcam.create(output_idx=monitor, output_color="BGRA")
         if self._cam is None:
             raise RuntimeError(f"cannot open capture on monitor {monitor}")
         self.width: int = self._cam.width
         self.height: int = self._cam.height
+        self._cursor = None
+        if cursor:
+            try:
+                dc = self._cam._output.desc.DesktopCoordinates  # monitor origin on the virtual desktop
+                origin = (int(dc.left), int(dc.top))
+            except Exception:
+                origin = (0, 0)
+            from .cursor import CursorOverlay
+            self._cursor = CursorOverlay(origin)
         self._last: np.ndarray | None = None
         self.errors = 0
 
     def grab(self) -> np.ndarray:
-        """Return the newest frame, or the previous one if nothing changed on screen."""
+        """Newest frame with the cursor drawn; repeats the previous frame if the screen is unchanged."""
+        frame = self._grab_raw()
+        return self._cursor.draw(frame) if self._cursor else frame
+
+    def _grab_raw(self) -> np.ndarray:
         try:
             frame = self._cam.grab()
         except Exception:

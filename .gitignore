@@ -9,3 +9,8 @@ receiver/build/
 receiver/app/build/
 receiver/local.properties
 .idea/
+
+# test runs, logs and captures live here, never committed
+logs/
+.tmp_appdata/
+rx_state.json
