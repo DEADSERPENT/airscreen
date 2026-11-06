@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import dataclasses
+from collections import deque
 import threading
 import time
 from typing import Callable
@@ -24,6 +25,8 @@ class StreamSession:
     def __init__(self, cfg: Config, on_status: Callable[[str], None] = lambda s: None,
                  store: TrustStore | None = None, pairing_code: str | None = None) -> None:
         self.cfg = cfg.validate()
+        from .config.settings import resolve_ffmpeg
+        self.cfg.ffmpeg_path = resolve_ffmpeg(self.cfg.ffmpeg_path)
         self._status = on_status
         self.store = store or TrustStore()
         self.pairing_code = pairing_code
@@ -124,11 +127,25 @@ class StreamSession:
             if cfg.auto_quality:
                 ch = negotiate(net.caps, capture.width, capture.height)
                 cfg = dataclasses.replace(cfg, width=ch.width, height=ch.height, fps=ch.fps, bitrate_kbps=ch.bitrate_kbps)
+                if cfg.force_width and cfg.force_height:
+                    cfg = dataclasses.replace(cfg, width=cfg.force_width, height=cfg.force_height)
+                if cfg.force_fps:
+                    cfg = dataclasses.replace(cfg, fps=cfg.force_fps)
+                if cfg.force_bitrate_kbps:
+                    cfg = dataclasses.replace(cfg, bitrate_kbps=cfg.force_bitrate_kbps)
                 for note in ch.notes:
                     self._status(f"Note: {note}")
             out_w, out_h = (cfg.width, cfg.height) if cfg.width else (capture.width, capture.height)
             net.begin(out_w, out_h, cfg.fps, audio_info)
-            encoder = FfmpegEncoder(cfg, capture.width, capture.height, net.submit_video)
+            cap_times: deque = deque(maxlen=64)
+            enc_ms: list = []
+
+            def on_access_unit(au: bytes, key: bool) -> None:
+                if cap_times and len(enc_ms) < 500:      # 1 AU per input frame, in order (no B-frames)
+                    enc_ms.append((time.monotonic() - cap_times.popleft()) * 1000)
+                net.submit_video(au, key)
+
+            encoder = FfmpegEncoder(cfg, capture.width, capture.height, on_access_unit)
             encoder.start()
             self._status(f"Streaming to {net.receiver_name}: {out_w}x{out_h} @ {cfg.fps} fps, "
                          f"{cfg.bitrate_kbps / 1000:.0f} Mbit/s{' + audio' if audio_info else ''}"
@@ -140,7 +157,9 @@ class StreamSession:
             while not self._stop.is_set():
                 if net.error:
                     raise Transient(f"Connection lost ({net.error})")
-                encoder.write_frame(capture.grab())
+                frame = capture.grab()
+                cap_times.append(time.monotonic())
+                encoder.write_frame(frame)
                 next_t += interval
                 delay = next_t - time.monotonic()
                 if delay > 0:
@@ -156,7 +175,12 @@ class StreamSession:
                         "dropped": net.dropped,
                         "capture_errors": capture.errors,
                         "audio_packets": audio.packets if audio else 0,
+                        "enc_ms": sum(enc_ms) / len(enc_ms) if enc_ms else 0.0,
+                        "enc_ms_max": max(enc_ms) if enc_ms else 0.0,
+                        "net_ms": sum(net.net_ms) / len(net.net_ms) if net.net_ms else 0.0,
+                        "net_ms_max": max(net.net_ms) if net.net_ms else 0.0,
                     }
+                    enc_ms.clear(); net.net_ms.clear()
                     last_report, last_bytes, last_frames = now, net.sent_bytes, encoder.frames_in
         finally:
             self._audio = None

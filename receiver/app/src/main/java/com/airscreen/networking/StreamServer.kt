@@ -34,6 +34,8 @@ class StreamServer(
     interface Listener {
         fun onWaiting()
         fun onConnected(remote: String)
+        /** Blocks the server thread until the person at the TV answers (or ~30 s pass). Must return false on timeout. */
+        fun onPairRequest(senderName: String): Boolean
         fun onPaired()
         fun onHello(hello: Hello)
         fun onVideo(data: ByteArray, ptsUs: Long, keyframe: Boolean)
@@ -187,6 +189,9 @@ class StreamServer(
             if (mode == "pair") pairing.registerFailure() else trust.revoke(deviceId)
             fail(out, "authentication failed")
         }
+        if (mode == "pair" && !listener.onPairRequest(sanitizeName(req.optString("name", "PC")))) {
+            fail(out, "The TV did not approve this request") // never silently approve (design system 8.2)
+        }
         send(out, Protocol.TYPE_AUTH_OK, 1, JSONObject().put("proof", Crypto.hex(Crypto.serverProof(secret, ns, nr))))
         if (mode == "pair") {
             trust.trust(deviceId, Crypto.deviceKey(secret, ns, nr))
@@ -194,6 +199,12 @@ class StreamServer(
             listener.onPaired()
         }
         return Crypto.MediaCipher(Crypto.sessionKey(secret, ns, nr))
+    }
+
+    /** The sender's display name is untrusted input shown on the TV: strip control characters, cap the length. */
+    private fun sanitizeName(raw: String): String {
+        val cleaned = raw.filter { it >= ' ' && it != '\u007f' }.trim().take(40)
+        return cleaned.ifEmpty { "A PC" }
     }
 
     private fun fail(out: OutputStream, reason: String): Nothing {

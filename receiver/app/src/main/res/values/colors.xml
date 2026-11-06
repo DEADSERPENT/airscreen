@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AirScreen design tokens (docs/AirScreen_Design_System.md section 2) -->
+<resources>
+    <color name="brand_primary">#8057FF</color>
+    <color name="brand_primary_hover">#916EFF</color>
+    <color name="brand_primary_subtle">#241B43</color>
+    <color name="brand_cyan">#22D3EE</color>
+    <color name="bg_canvas">#070A14</color>
+    <color name="bg_sidebar">#0D1222</color>
+    <color name="bg_surface">#11182A</color>
+    <color name="bg_raised">#0F1628</color>
+    <color name="bg_overlay">#202A42</color>
+    <color name="border_default">#222D46</color>
+    <color name="border_strong">#43516E</color>
+    <color name="text_primary">#F7F8FC</color>
+    <color name="text_secondary">#B3BDD0</color>
+    <color name="text_tertiary">#8491AA</color>
+    <color name="status_success">#34D399</color>
+    <color name="status_warning">#FBBF24</color>
+    <color name="status_danger">#F87171</color>
+    <color name="focus_ring">#C9B8FF</color>
+    <color name="scrim">#CC04060E</color>
+</resources>

@@ -10,6 +10,25 @@ class ConfigError(ValueError):
     pass
 
 
+def resolve_ffmpeg(configured: str = "ffmpeg") -> str:
+    """Find ffmpeg: explicit path, next to the app (installed build), PATH, then common locations."""
+    import shutil
+    import sys
+    if configured and configured != "ffmpeg" and Path(configured).exists():
+        return configured
+    here = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parents[2]
+    for cand in (here / "ffmpeg.exe", here / "ffmpeg" / "ffmpeg.exe"):
+        if cand.exists():
+            return str(cand)
+    found = shutil.which("ffmpeg")
+    if found:
+        return found
+    for cand in (Path("C:/ffmpeg/ffmpeg.exe"), Path("C:/ffmpeg/bin/ffmpeg.exe")):
+        if cand.exists():
+            return str(cand)
+    return configured
+
+
 @dataclass
 class Config:
     receiver_ip: str = ""
@@ -20,6 +39,10 @@ class Config:
     height: int = 1080
     fps: int = 30
     bitrate_kbps: int = 12000
+    force_width: int = 0        # per-field overrides on top of auto quality (0 = let auto decide)
+    force_height: int = 0
+    force_fps: int = 0
+    force_bitrate_kbps: int = 0
     cursor: bool = True
     audio: bool = True
     audio_bitrate_kbps: int = 192

@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- one pairing-code tile: tabular numerals, even rhythm -->
+    <style name="CodeTile">
+        <item name="android:layout_width">104dp</item>
+        <item name="android:layout_height">60dp</item>
+        <item name="android:layout_marginStart">6dp</item>
+        <item name="android:layout_marginEnd">6dp</item>
+        <item name="android:background">@drawable/tile</item>
+        <item name="android:gravity">center</item>
+        <item name="android:fontFamily">@font/inter</item>
+        <item name="android:fontFeatureSettings">"tnum" 1</item>
+        <item name="android:letterSpacing">0.1</item>
+        <item name="android:text">····</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textFontWeight">700</item>
+        <item name="android:textSize">28sp</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <!-- focusable settings row (title + supporting text) -->
+    <style name="SettingsRow">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">12dp</item>
+        <item name="android:background">@drawable/row_item</item>
+        <item name="android:focusable">true</item>
+        <item name="android:clickable">true</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:minHeight">76dp</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:paddingStart">22dp</item>
+        <item name="android:paddingEnd">22dp</item>
+        <item name="android:paddingTop">12dp</item>
+        <item name="android:paddingBottom">12dp</item>
+    </style>
+
+    <style name="RowTitle">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:fontFamily">@font/inter</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textFontWeight">600</item>
+        <item name="android:textSize">20sp</item>
+    </style>
+
+    <style name="RowSub">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">2dp</item>
+        <item name="android:fontFamily">@font/inter</item>
+        <item name="android:textColor">@color/text_secondary</item>
+        <item name="android:textFontWeight">400</item>
+        <item name="android:textSize">17sp</item>
+    </style>
+
+    <style name="StepNum">
+        <item name="android:layout_width">26dp</item>
+        <item name="android:layout_height">26dp</item>
+        <item name="android:background">@drawable/step_circle</item>
+        <item name="android:gravity">center</item>
+        <item name="android:fontFamily">@font/inter</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textFontWeight">700</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="StepText">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginStart">10dp</item>
+        <item name="android:fontFamily">@font/inter</item>
+        <item name="android:textColor">@color/text_secondary</item>
+        <item name="android:textFontWeight">500</item>
+        <item name="android:textSize">17sp</item>
+    </style>
+</resources>

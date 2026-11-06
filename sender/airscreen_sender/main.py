@@ -92,9 +92,13 @@ def main(argv: list[str] | None = None) -> int:
                 bad += not c.ok
             return 1 if bad else 0
         if not cfg.receiver_ip:
-            from .gui import run_gui
-            run_gui(cfg)
-            return 0
+            try:
+                from .app import run
+                return run()
+            except ImportError:  # pywebview unavailable: fall back to the basic window
+                from .gui import run_gui
+                run_gui(cfg)
+                return 0
         cfg.validate()
     except ConfigError as e:
         print(f"config error: {e}", file=sys.stderr)
@@ -110,7 +114,8 @@ def main(argv: list[str] | None = None) -> int:
                 if session.stats:
                     s = session.stats
                     print(f"  in {s['fps_in']:.1f} fps | {s['mbps']:.1f} Mbit/s | dropped {int(s['dropped'])}"
-                          f" | audio pkts {int(s['audio_packets'])}", flush=True)
+                          f" | audio pkts {int(s['audio_packets'])}"
+                          f" | encode {s['enc_ms']:.0f}/{s['enc_ms_max']:.0f} ms | send {s['net_ms']:.0f}/{s['net_ms_max']:.0f} ms", flush=True)
         except KeyboardInterrupt:
             print("stopping...")
             session.stop()

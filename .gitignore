@@ -14,3 +14,7 @@ receiver/local.properties
 logs/
 .tmp_appdata/
 rx_state.json
+
+build/
+dist/
+*.spec

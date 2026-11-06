@@ -94,9 +94,10 @@ class TcpSender:
         """Connect and authenticate. Call begin() once the stream settings are decided."""
         self._sock = socket.create_connection((ip, port), timeout=5)
         try:
-            self._sock.settimeout(10)  # stalled receiver -> error instead of hanging
+            self._sock.settimeout(40)  # pairing waits for a person to press Allow on the TV
             self._sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             self._cipher, self.receiver_name, self.caps = handshake(self._sock, store, pairing_code)
+            self._sock.settimeout(10)  # streaming: a stalled receiver becomes an error instead of a hang
         except BaseException:
             self._sock.close()
             raise
@@ -106,6 +107,7 @@ class TcpSender:
         self._need_key = True  # start (and resume after drops) on a keyframe
         self.dropped = 0
         self.sent_bytes = 0
+        self.net_ms: list[float] = []   # time a video frame waited in our queue + socket send
         self.error: Exception | None = None
 
     def begin(self, width: int, height: int, fps: int, audio_info: dict | None = None) -> None:
@@ -141,7 +143,7 @@ class TcpSender:
             self._need_key = True
             return
         self._need_key = False
-        self._q.put((TYPE_VIDEO, FLAG_KEYFRAME if keyframe else 0, self._pts(), au))
+        self._q.put((TYPE_VIDEO, FLAG_KEYFRAME if keyframe else 0, self._pts(), au, time.monotonic()))
 
     def submit_audio(self, packet: bytes) -> None:
         if not self.error:
@@ -162,7 +164,9 @@ class TcpSender:
                 item = self._q.get()
                 if item is None:
                     return
-                self._send(*item)
+                self._send(*item[:4])
+                if len(item) > 4 and len(self.net_ms) < 500:
+                    self.net_ms.append((time.monotonic() - item[4]) * 1000)
         except Exception as e:  # connection lost / timed out
             self.error = e
 

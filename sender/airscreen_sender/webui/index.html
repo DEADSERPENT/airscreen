@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>AirScreen</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="side" aria-label="Primary">
+    <div class="brand">
+      <img src="logo.png" alt="" class="brand-logo" width="40" height="40">
+      <div><b>AirScreen</b><small>Wireless screen streaming</small></div>
+    </div>
+    <nav id="nav">
+      <button class="nav active" data-view="cast"><img class="i3d" src="icons/icon-nav-cast@128.png" alt=""><span>Cast</span></button>
+      <button class="nav" data-view="devices"><img class="i3d" src="icons/icon-nav-devices@128.png" alt=""><span>Devices</span></button>
+      <button class="nav" data-view="streaming"><img class="i3d" src="icons/icon-nav-streaming@128.png" alt=""><span>Streaming</span><i class="navdot" id="navlive" hidden></i></button>
+      <button class="nav" data-view="settings"><img class="i3d" src="icons/icon-nav-settings@128.png" alt=""><span>Settings</span></button>
+      <button class="nav" data-view="logs"><img class="i3d" src="icons/icon-nav-logs@128.png" alt=""><span>Logs</span></button>
+      <button class="nav" data-view="about"><img class="i3d" src="icons/icon-nav-about@128.png" alt=""><span>About</span></button>
+    </nav>
+    <div class="side-foot"><img class="i3d sm" src="icons/icon-device-desktop@64.png" alt=""><span id="pcname">This PC</span></div>
+  </aside>
+
+  <main id="main">
+    <!-- ============ CAST ============ -->
+    <section class="view active" id="view-cast" aria-labelledby="h-cast">
+      <header class="head">
+        <div><h1 id="h-cast">Cast your screen</h1><p class="sub">Stream your display to your TV, securely, over your own network.</p></div>
+        <div class="status" id="netstatus"><img class="i3d sm" src="icons/icon-network-wifi@64.png" alt=""><span id="netlabel">Local network</span></div>
+      </header>
+
+      <div class="cast-layout">
+        <div class="cast-col">
+          <div class="field-label" id="lbl-receiver">Receiver</div>
+          <div class="device-wrap">
+            <button class="device card" id="devicecard" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="lbl-receiver devname">
+              <img class="i3d md" src="icons/icon-device-tv@128.png" alt="">
+              <span class="dev-txt">
+                <b id="devname">No TV selected</b>
+                <small id="devsub">Scan for TVs on your network, or enter an address</small>
+                <span class="badges" id="devbadges"></span>
+              </span>
+              <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="menu" id="devmenu" role="listbox" aria-label="TVs" hidden>
+              <div class="menu-head"><span id="scanstate">TVs on your network</span><button id="scanbtn" class="btn tertiary sm">Scan again</button></div>
+              <div id="devlist"></div>
+              <div class="manual"><label class="sr" for="manualip">TV address</label><input id="manualip" placeholder="Enter an address, e.g. 192.168.1.2" inputmode="decimal" spellcheck="false" autocomplete="off"><button id="manualuse" class="btn secondary sm">Use address</button></div>
+            </div>
+          </div>
+
+          <div class="field-label">Source</div>
+          <div class="sources" role="radiogroup" aria-label="Source">
+            <button class="source on" role="radio" aria-checked="true"><img class="i3d" src="icons/icon-device-desktop@128.png" alt=""><span><b>Entire screen</b><small>Your primary display</small></span></button>
+            <button class="source" role="radio" aria-checked="false" disabled aria-disabled="true"><span><b>Window</b><small>Not available yet</small></span></button>
+            <button class="source" role="radio" aria-checked="false" disabled aria-disabled="true"><span><b>Application</b><small>Not available yet</small></span></button>
+          </div>
+
+          <button class="btn primary lg" id="cta" aria-live="polite"><span class="spin" aria-hidden="true"></span><span id="ctalabel">Start streaming</span></button>
+          <div class="err" id="casterr" role="alert"></div>
+
+          <div class="summary card" aria-label="Quality summary">
+            <div class="kv"><small>Video</small><b id="chipvideo">Automatic</b><em id="chipvideo-t">Configured</em></div>
+            <div class="kv"><small>Audio</small><b id="chipaudio">Opus stereo</b><em>Configured</em></div>
+            <div class="kv"><small>Security</small><b>AES-256-GCM</b><em>Negotiated</em></div>
+            <div class="kv"><small>Bitrate</small><b id="chiprate">—</b><em>Measured</em></div>
+          </div>
+        </div>
+
+        <aside class="cast-aside" aria-hidden="true">
+          <div class="hero"><img src="icons/icon-device-tv@256.png" alt="" width="200" height="200"><img class="hero-wifi" src="icons/icon-network-wifi@128.png" alt="" width="84" height="84"></div>
+          <p class="hero-note">Both devices must be on the same network. AirScreen never uses the internet.</p>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============ DEVICES ============ -->
+    <section class="view" id="view-devices" aria-labelledby="h-devices">
+      <header class="head"><div><h1 id="h-devices">Devices</h1><p class="sub">TVs found on your network and the ones you’ve paired.</p></div><button class="btn secondary" id="scanbtn2">Scan again</button></header>
+      <h2 class="eyebrow">Available</h2>
+      <div id="devices-found" class="list"></div>
+      <h2 class="eyebrow">Paired</h2>
+      <div id="devices-paired" class="list"></div>
+    </section>
+
+    <!-- ============ STREAMING ============ -->
+    <section class="view" id="view-streaming" aria-labelledby="h-streaming">
+      <header class="head"><div><h1 id="h-streaming">Streaming</h1><p class="sub" id="streamsub">Not streaming</p></div>
+        <span class="badge" id="streambadge">Idle</span></header>
+      <div id="stream-empty" class="empty-state card">
+        <img class="i3d xl" src="icons/icon-nav-cast@256.png" alt="">
+        <h2>You’re not streaming</h2>
+        <p>Pick a TV and start streaming from Cast. Live details will appear here.</p>
+        <button class="btn primary" data-goto="cast">Go to Cast</button>
+      </div>
+      <div id="stream-live" hidden>
+        <div class="card live-head">
+          <img class="i3d md" src="icons/icon-device-tv@128.png" alt="">
+          <div class="grow"><b id="livetitle">—</b><small id="livesub">—</small></div>
+          <button class="btn secondary" id="mutebtn" aria-pressed="false"><img class="i3d sm" id="muteicon" src="icons/icon-audio-volume@64.png" alt=""><span id="mutelabel">Audio on</span></button>
+          <button class="btn danger" id="stopbtn">Stop streaming</button>
+        </div>
+        <div class="card spark-card">
+          <div class="spark-head"><small>Bitrate (measured)</small><b id="sparkval">—</b></div>
+          <svg class="spark" viewBox="0 0 300 56" preserveAspectRatio="none" role="img" aria-label="Bitrate over the last minute"><path id="sparkfill" fill="rgba(128,87,255,.18)" d=""/><polyline id="sparkline" fill="none" stroke="#8057FF" stroke-width="2" stroke-linejoin="round" points=""/></svg>
+        </div>
+        <table class="telemetry card" aria-label="Stream details">
+          <thead><tr><th>Setting</th><th>Value</th><th>Type</th></tr></thead>
+          <tbody>
+            <tr><td>Resolution &amp; frame rate</td><td id="t-res">—</td><td><span class="tag">Negotiated</span></td></tr>
+            <tr><td>Codec</td><td>H.264 (NVIDIA NVENC)</td><td><span class="tag">Negotiated</span></td></tr>
+            <tr><td>Capture rate</td><td id="t-fps">—</td><td><span class="tag m">Measured</span></td></tr>
+            <tr><td>Sending</td><td id="t-rate">—</td><td><span class="tag m">Measured</span></td></tr>
+            <tr><td>Dropped frames</td><td id="t-drop">—</td><td><span class="tag m">Measured</span></td></tr>
+            <tr><td>End-to-end latency</td><td>Not measured</td><td><span class="tag">Unavailable</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ SETTINGS ============ -->
+    <section class="view" id="view-settings" aria-labelledby="h-settings">
+      <header class="head"><div><h1 id="h-settings">Settings</h1><p class="sub">Defaults work for most setups. Changes apply the next time you start streaming.</p></div></header>
+
+      <section class="setgroup card" aria-labelledby="g-video"><h2 id="g-video">Video</h2>
+        <div class="row"><div><b>Resolution</b><small>Automatic follows what your TV supports and never upscales.</small></div><div class="seg" role="radiogroup" aria-label="Resolution" data-key="resolution"><button role="radio" data-v="auto">Auto</button><button role="radio" data-v="1280x720">720p</button><button role="radio" data-v="1920x1080">1080p</button><button role="radio" data-v="2560x1440">1440p</button><button role="radio" data-v="source">Source</button></div></div>
+        <div class="row"><div><b>Frame rate</b><small>60 fps needs a strong link. Ethernet or 5 GHz Wi-Fi on the TV is recommended.</small></div><div class="seg" role="radiogroup" aria-label="Frame rate" data-key="fps"><button role="radio" data-v="auto">Auto</button><button role="radio" data-v="30">30</button><button role="radio" data-v="60">60</button></div></div>
+        <div class="row"><div><b>Bitrate</b><small>Higher is sharper but needs more bandwidth. Automatic adapts to the link.</small></div><div class="seg" role="radiogroup" aria-label="Bitrate" data-key="bitrate"><button role="radio" data-v="auto">Auto</button><button role="radio" data-v="8000">8</button><button role="radio" data-v="12000">12</button><button role="radio" data-v="20000">20</button><button role="radio" data-v="30000">30 Mbit/s</button></div></div>
+        <div class="row"><div><b>Mouse pointer</b><small>Draw the cursor into the stream.</small></div><label class="sw"><input type="checkbox" data-key="cursor" aria-label="Show mouse pointer"><i></i></label></div>
+      </section>
+
+      <section class="setgroup card" aria-labelledby="g-audio"><h2 id="g-audio">Audio</h2>
+        <div class="row"><div><b>Stream system audio</b><small>Opus stereo, sent with the picture.</small></div><label class="sw"><input type="checkbox" data-key="audio" aria-label="Stream system audio"><i></i></label></div>
+      </section>
+
+      <section class="setgroup card" aria-labelledby="g-net"><h2 id="g-net">Network</h2>
+        <div class="row"><div><b>Reconnect automatically</b><small>Resume after a Wi-Fi drop or a TV restart.</small></div><label class="sw"><input type="checkbox" data-key="reconnect" aria-label="Reconnect automatically"><i></i></label></div>
+        <div class="row"><div><b>Connection</b><small>Direct to your TV on the local network. No cloud, no relay.</small></div><span class="tag" id="netinfo">—</span></div>
+      </section>
+
+      <section class="setgroup card" aria-labelledby="g-sec"><h2 id="g-sec">Security</h2>
+        <div class="row"><div><b>Encryption</b><small>Video and audio are encrypted end to end with AES-256-GCM.</small></div><span class="tag ok">Always on</span></div>
+        <div class="row"><div><b>Paired TVs</b><small>Manage which TVs your PC trusts.</small></div><button class="btn secondary sm" data-goto="devices">Manage in Devices</button></div>
+      </section>
+
+      <section class="setgroup card" aria-labelledby="g-adv"><h2 id="g-adv">Advanced</h2>
+        <div class="row"><div><b>Video encoder</b><small>Hardware H.264 on your NVIDIA GPU.</small></div><span class="tag">NVENC · h264_nvenc</span></div>
+      </section>
+      <p class="muted small foot-note">Run a full system check in <button class="link" data-goto="about">About</button>.</p>
+    </section>
+
+    <!-- ============ LOGS ============ -->
+    <section class="view" id="view-logs" aria-labelledby="h-logs">
+      <header class="head"><div><h1 id="h-logs">Logs</h1><p class="sub">Stored on this PC only. Keys and pairing codes are never written here.</p></div>
+        <div class="btnrow"><button class="btn secondary" id="copylogs">Copy</button><button class="btn secondary" id="openfolder">Open folder</button></div></header>
+      <div class="toolbar">
+        <div class="seg" role="radiogroup" aria-label="Severity" id="logfilter"><button role="radio" data-v="all" class="on">All</button><button role="radio" data-v="warn">Warnings</button><button role="radio" data-v="error">Errors</button></div>
+        <label class="sr" for="logsearch">Search logs</label><input id="logsearch" class="search" placeholder="Search logs" autocomplete="off">
+      </div>
+      <div class="card logbox" id="logbox" tabindex="0" aria-label="Log entries"></div>
+    </section>
+
+    <!-- ============ ABOUT ============ -->
+    <section class="view" id="view-about" aria-labelledby="h-about">
+      <header class="head"><div><h1 id="h-about">About</h1><p class="sub">AirScreen <span id="aboutver"></span> · protocol v<span id="aboutproto"></span></p></div><button class="btn secondary" id="rerun">Run checks again</button></header>
+      <section class="setgroup card" aria-labelledby="g-chk"><h2 id="g-chk">Diagnostics</h2><div id="checks" class="checks"><div class="muted">Running checks…</div></div></section>
+      <section class="setgroup card" aria-labelledby="g-priv"><h2 id="g-priv">Privacy</h2>
+        <p class="body">No account, no cloud, no telemetry. Your screen and audio stay on your local network, encrypted. A TV is trusted only after you approve it with a one-time code.</p></section>
+    </section>
+  </main>
+</div>
+
+<!-- pairing dialog -->
+<div class="modal" id="pairmodal" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="pairtitle" aria-describedby="pairdesc">
+    <img class="i3d lg" src="icons/icon-security-shield@128.png" alt="">
+    <h2 id="pairtitle">Pair with <span id="pairname">your TV</span></h2>
+    <p class="sub" id="pairdesc">Pairing makes this TV trusted so future connections are quick and encrypted. Enter the 16-character code shown on the TV. You only do this once.</p>
+    <div class="codeboxes" id="codeboxes" role="group" aria-label="Pairing code">
+      <input maxlength="4" autocomplete="off" spellcheck="false" aria-label="Code characters 1 to 4"><input maxlength="4" autocomplete="off" spellcheck="false" aria-label="Code characters 5 to 8"><input maxlength="4" autocomplete="off" spellcheck="false" aria-label="Code characters 9 to 12"><input maxlength="4" autocomplete="off" spellcheck="false" aria-label="Code characters 13 to 16">
+    </div>
+    <div class="err" id="pairerr" role="alert"></div>
+    <div class="actions"><button class="btn tertiary" id="paircancel">Cancel</button><button class="btn primary" id="pairgo">Pair and connect</button></div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
+<script src="app.js"></script>
+</body>
+</html>

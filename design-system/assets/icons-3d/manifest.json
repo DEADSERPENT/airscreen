@@ -1,0 +1,261 @@
+{
+  "family": "AirScreen 3D Icons (pilot)",
+  "version": "0.1.0",
+  "icons": [
+    {
+      "name": "icon-action-refresh",
+      "version": "0.1.0",
+      "source": "source/icon-action-refresh.svg",
+      "sizes": [
+        256,
+        128,
+        64
+      ],
+      "exports": [
+        "exports/icon-action-refresh@256.png",
+        "exports/icon-action-refresh@128.png",
+        "exports/icon-action-refresh@64.png"
+      ],
+      "usage": "Windows nav/cards (64-128), TV (256). Static; never animate over video.",
+      "generator": "design-system/tools/gen_icons.py"
+    },
+    {
+      "name": "icon-audio-mute",
+      "version": "0.1.0",
+      "source": "source/icon-audio-mute.svg",
+      "sizes": [
+        256,
+        128,
+        64
+      ],
+      "exports": [
+        "exports/icon-audio-mute@256.png",
+        "exports/icon-audio-mute@128.png",
+        "exports/icon-audio-mute@64.png"
+      ],
+      "usage": "Windows nav/cards (64-128), TV (256). Static; never animate over video.",
+      "generator": "design-system/tools/gen_icons.py"
+    },
+    {
+      "name": "icon-audio-volume",
+      "version": "0.1.0",
+      "source": "source/icon-audio-volume.svg",
+      "sizes": [
+        256,
+        128,
+        64
+      ],
+      "exports": [
+        "exports/icon-audio-volume@256.png",
+        "exports/icon-audio-volume@128.png",
+        "exports/icon-audio-volume@64.png"
+      ],
+      "usage": "Windows nav/cards (64-128), TV (256). Static; never animate over video.",
+      "generator": "design-system/tools/gen_icons.py"
+    },
+    {
+      "name": "icon-device-desktop",
+      "version": "0.1.0",
+      "source": "source/icon-device-desktop.svg",
+      "sizes": [
+        256,
+        128,
+        64
+      ],
+      "exports": [
+        "exports/icon-device-desktop@256.png",
+        "exports/icon-device-desktop@128.png",
+        "exports/icon-device-desktop@64.png"
+      ],
+      "usage": "Windows nav/cards (64-128), TV (256). Static; never animate over video.",
+      "generator": "design-system/tools/gen_icons.py"
+    },
+    {
+      "name": "icon-device-laptop",
+      "version": "0.1.0",
+      "source": "source/icon-device-laptop.svg",
+      "sizes": [
+        256,
+        128,
+        64
+      ],
+      "exports": [
+        "exports/icon-device-laptop@256.png",
+        "exports/icon-device-laptop@128.png",
+        "exports/icon-device-laptop@64.png"
+      ],
+      "usage": "Windows nav/cards (64-128), TV (256). Static; never animate over video.",
+      "generator": "design-system/tools/gen_icons.py"
+    },
+    {
+      "name": "icon-device-tv",
+      "version": "0.1.0",
+      "source": "source/icon-device-tv.svg",
+      "sizes": [
+        256,
+        128,
+        64
+      ],
+      "exports": [
+        "exports/icon-device-tv@256.png",
+        "exports/icon-device-tv@128.png",
+        "exports/icon-device-tv@64.png"
+      ],
+      "usage": "Windows nav/cards (64-128), TV (256). Static; never animate over video.",
+      "generator": "design-system/tools/gen_icons.py"
+    },
+    {
+      "name": "icon-nav-about",
+      "version": "0.1.0",
+      "source": "source/icon-nav-about.svg",
+      "sizes": [
+        256,
+        128,
+        64
+      ],
+      "exports": [
+        "exports/icon-nav-about@256.png",
+        "exports/icon-nav-about@128.png",
+        "exports/icon-nav-about@64.png"
+      ],
+      "usage": "Windows nav/cards (64-128), TV (256). Static; never animate over video.",
+      "generator": "design-system/tools/gen_icons.py"
+    },
+    {
+      "name": "icon-nav-cast",
+      "version": "0.1.0",
+      "source": "source/icon-nav-cast.svg",
+      "sizes": [
+        256,
+        128,
+        64
+      ],
+      "exports": [
+        "exports/icon-nav-cast@256.png",
+        "exports/icon-nav-cast@128.png",
+        "exports/icon-nav-cast@64.png"
+      ],
+      "usage": "Windows nav/cards (64-128), TV (256). Static; never animate over video.",
+      "generator": "design-system/tools/gen_icons.py"
+    },
+    {
+      "name": "icon-nav-devices",
+      "version": "0.1.0",
+      "source": "source/icon-nav-devices.svg",
+      "sizes": [
+        256,
+        128,
+        64
+      ],
+      "exports": [
+        "exports/icon-nav-devices@256.png",
+        "exports/icon-nav-devices@128.png",
+        "exports/icon-nav-devices@64.png"
+      ],
+      "usage": "Windows nav/cards (64-128), TV (256). Static; never animate over video.",
+      "generator": "design-system/tools/gen_icons.py"
+    },
+    {
+      "name": "icon-nav-logs",
+      "version": "0.1.0",
+      "source": "source/icon-nav-logs.svg",
+      "sizes": [
+        256,
+        128,
+        64
+      ],
+      "exports": [
+        "exports/icon-nav-logs@256.png",
+        "exports/icon-nav-logs@128.png",
+        "exports/icon-nav-logs@64.png"
+      ],
+      "usage": "Windows nav/cards (64-128), TV (256). Static; never animate over video.",
+      "generator": "design-system/tools/gen_icons.py"
+    },
+    {
+      "name": "icon-nav-settings",
+      "version": "0.1.0",
+      "source": "source/icon-nav-settings.svg",
+      "sizes": [
+        256,
+        128,
+        64
+      ],
+      "exports": [
+        "exports/icon-nav-settings@256.png",
+        "exports/icon-nav-settings@128.png",
+        "exports/icon-nav-settings@64.png"
+      ],
+      "usage": "Windows nav/cards (64-128), TV (256). Static; never animate over video.",
+      "generator": "design-system/tools/gen_icons.py"
+    },
+    {
+      "name": "icon-nav-streaming",
+      "version": "0.1.0",
+      "source": "source/icon-nav-streaming.svg",
+      "sizes": [
+        256,
+        128,
+        64
+      ],
+      "exports": [
+        "exports/icon-nav-streaming@256.png",
+        "exports/icon-nav-streaming@128.png",
+        "exports/icon-nav-streaming@64.png"
+      ],
+      "usage": "Windows nav/cards (64-128), TV (256). Static; never animate over video.",
+      "generator": "design-system/tools/gen_icons.py"
+    },
+    {
+      "name": "icon-network-wifi",
+      "version": "0.1.0",
+      "source": "source/icon-network-wifi.svg",
+      "sizes": [
+        256,
+        128,
+        64
+      ],
+      "exports": [
+        "exports/icon-network-wifi@256.png",
+        "exports/icon-network-wifi@128.png",
+        "exports/icon-network-wifi@64.png"
+      ],
+      "usage": "Windows nav/cards (64-128), TV (256). Static; never animate over video.",
+      "generator": "design-system/tools/gen_icons.py"
+    },
+    {
+      "name": "icon-security-shield",
+      "version": "0.1.0",
+      "source": "source/icon-security-shield.svg",
+      "sizes": [
+        256,
+        128,
+        64
+      ],
+      "exports": [
+        "exports/icon-security-shield@256.png",
+        "exports/icon-security-shield@128.png",
+        "exports/icon-security-shield@64.png"
+      ],
+      "usage": "Windows nav/cards (64-128), TV (256). Static; never animate over video.",
+      "generator": "design-system/tools/gen_icons.py"
+    },
+    {
+      "name": "icon-status-warning",
+      "version": "0.1.0",
+      "source": "source/icon-status-warning.svg",
+      "sizes": [
+        256,
+        128,
+        64
+      ],
+      "exports": [
+        "exports/icon-status-warning@256.png",
+        "exports/icon-status-warning@128.png",
+        "exports/icon-status-warning@64.png"
+      ],
+      "usage": "Windows nav/cards (64-128), TV (256). Static; never animate over video.",
+      "generator": "design-system/tools/gen_icons.py"
+    }
+  ]
+}

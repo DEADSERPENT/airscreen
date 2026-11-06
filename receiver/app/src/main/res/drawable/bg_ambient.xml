@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- static ambient background (design system 2.4): very low contrast, never animated -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item><shape android:shape="rectangle"><solid android:color="@color/bg_canvas" /></shape></item>
+    <item><shape android:shape="rectangle"><gradient android:type="radial" android:gradientRadius="60%p" android:centerX="0.15" android:centerY="0.95" android:startColor="#298057FF" android:endColor="#008057FF" /></shape></item>
+    <item><shape android:shape="rectangle"><gradient android:type="radial" android:gradientRadius="55%p" android:centerX="0.9" android:centerY="0.9" android:startColor="#1822D3EE" android:endColor="#0022D3EE" /></shape></item>
+</layer-list>

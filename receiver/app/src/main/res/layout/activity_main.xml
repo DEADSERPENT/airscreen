@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- AirScreen TV receiver. Layers: video, ready, pairing approval, stop confirmation, settings, HUD. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -10,62 +11,428 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <LinearLayout
+    <!-- GPU-composed output: the Realtek decoder renders correctly through a texture, not the direct video plane -->
+    <TextureView
+        android:id="@+id/videoTex"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
+    <!-- ===== Ready to connect (8.1) ===== -->
+    <FrameLayout
         android:id="@+id/overlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#101820"
-        android:gravity="center"
-        android:orientation="vertical">
+        android:background="@drawable/bg_ambient"
+        android:paddingStart="48dp"
+        android:paddingTop="32dp"
+        android:paddingEnd="48dp"
+        android:paddingBottom="28dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipChildren="false"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <ImageView
+                android:id="@+id/logo"
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:contentDescription="AirScreen"
+                android:src="@drawable/brand_logo" />
+
+            <TextView
+                android:id="@+id/headline"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:fontFamily="@font/inter"
+                android:text="Ready to connect"
+                android:textColor="@color/text_primary"
+                android:textFontWeight="700"
+                android:textSize="40sp" />
+
+            <TextView
+                android:id="@+id/status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:fontFamily="@font/inter"
+                android:gravity="center"
+                android:text="Open AirScreen on your PC and choose this TV."
+                android:textColor="@color/text_secondary"
+                android:textFontWeight="400"
+                android:textSize="20sp" />
+
+            <LinearLayout
+                android:id="@+id/stepsRow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView style="@style/StepNum" android:text="1" />
+                <TextView style="@style/StepText" android:text="Open AirScreen on your PC" />
+
+                <TextView style="@style/StepNum" android:layout_marginStart="22dp" android:text="2" />
+                <TextView style="@style/StepText" android:text="Choose this TV" />
+
+                <TextView style="@style/StepNum" android:layout_marginStart="22dp" android:text="3" />
+                <TextView style="@style/StepText" android:text="Enter the code, then Allow" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/codeSection"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="26dp"
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/inter"
+                    android:letterSpacing="0.12"
+                    android:text="PAIRING CODE"
+                    android:textColor="@color/text_tertiary"
+                    android:textFontWeight="600"
+                    android:textSize="14sp" />
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/code1"
+                        style="@style/CodeTile" />
+
+                    <TextView
+                        android:id="@+id/code2"
+                        style="@style/CodeTile" />
+
+                    <TextView
+                        android:id="@+id/code3"
+                        style="@style/CodeTile" />
+
+                    <TextView
+                        android:id="@+id/code4"
+                        style="@style/CodeTile" />
+                </LinearLayout>
+            </LinearLayout>
+
+        </LinearLayout>
 
         <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="AirScreen"
-            android:textColor="#FFFFFF"
-            android:textSize="48sp"
-            android:textStyle="bold" />
+                android:id="@+id/address"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|start"
+                android:background="@drawable/chip"
+                android:fontFamily="@font/inter"
+                android:paddingStart="18dp"
+                android:paddingTop="8dp"
+                android:paddingEnd="18dp"
+                android:paddingBottom="8dp"
+                android:textColor="@color/text_secondary"
+                android:textFontWeight="500"
+                android:textSize="16sp" />
 
-        <TextView
-            android:id="@+id/headline"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="Ready to connect"
-            android:textColor="#9FB3C8"
-            android:textSize="28sp" />
+        <Button
+                android:id="@+id/settingsBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="52dp"
+                android:layout_gravity="bottom|end"
+                android:background="@drawable/btn_secondary"
+                android:fontFamily="@font/inter"
+                android:minWidth="170dp"
+                android:paddingStart="28dp"
+                android:paddingEnd="28dp"
+                android:stateListAnimator="@null"
+                android:text="Settings"
+                android:textAllCaps="false"
+                android:textColor="@color/text_primary"
+                android:textFontWeight="600"
+                android:textSize="18sp" />
+    </FrameLayout>
 
-        <TextView
-            android:id="@+id/address"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
-            android:textColor="#FFFFFF"
-            android:textSize="32sp" />
+    <!-- ===== Pairing approval (8.2): explicit, never silent ===== -->
+    <FrameLayout
+        android:id="@+id/pairLayer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/scrim"
+        android:visibility="gone">
 
-        <TextView
-            android:id="@+id/status"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:id="@+id/pairPanel"
+            android:layout_width="460dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:textColor="#9FB3C8"
-            android:textSize="22sp" />
+            android:layout_gravity="center"
+            android:background="@drawable/dialog_panel"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:padding="30dp">
 
-        <TextView
-            android:id="@+id/pairing"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
-            android:textColor="#2F80ED"
-            android:textSize="30sp"
-            android:textStyle="bold" />
+            <ImageView
+                android:layout_width="68dp"
+                android:layout_height="68dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic3d_security_shield" />
 
-        <TextView
-            android:layout_width="wrap_content"
+            <TextView
+                android:id="@+id/pairTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:fontFamily="@font/inter"
+                android:gravity="center"
+                android:text="Allow this PC to cast?"
+                android:textColor="@color/text_primary"
+                android:textFontWeight="700"
+                android:textSize="26sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:fontFamily="@font/inter"
+                android:gravity="center"
+                android:lineSpacingMultiplier="1.1"
+                android:text="This PC entered the correct pairing code and wants to show its screen on this TV. Allow it only if you just started this on your PC."
+                android:textColor="@color/text_secondary"
+                android:textFontWeight="400"
+                android:textSize="18sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="26dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/denyBtn"
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/btn_secondary"
+                    android:fontFamily="@font/inter"
+                    android:stateListAnimator="@null"
+                    android:text="Deny"
+                    android:textAllCaps="false"
+                    android:textColor="@color/text_primary"
+                    android:textFontWeight="600"
+                    android:textSize="20sp" />
+
+                <Button
+                    android:id="@+id/allowBtn"
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/btn_primary"
+                    android:fontFamily="@font/inter"
+                    android:stateListAnimator="@null"
+                    android:text="Allow"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    android:textFontWeight="600"
+                    android:textSize="20sp" />
+            </LinearLayout>
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- ===== Back during streaming: deliberate, never accidental (8.3) ===== -->
+    <FrameLayout
+        android:id="@+id/stopLayer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/scrim"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/stopPanel"
+            android:layout_width="440dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="48dp"
-            android:text="Pick this TV in AirScreen on your PC. First time: enter the pairing code. Back = disconnect, Menu = forget all paired PCs."
-            android:textColor="#5F7388"
-            android:textSize="18sp" />
-    </LinearLayout>
+            android:layout_gravity="center"
+            android:background="@drawable/dialog_panel"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:padding="30dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/inter"
+                android:gravity="center"
+                android:text="Stop streaming?"
+                android:textColor="@color/text_primary"
+                android:textFontWeight="700"
+                android:textSize="26sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:fontFamily="@font/inter"
+                android:gravity="center"
+                android:text="Your PC will be disconnected from this TV."
+                android:textColor="@color/text_secondary"
+                android:textFontWeight="400"
+                android:textSize="18sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="26dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/stopBtn"
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/btn_secondary"
+                    android:fontFamily="@font/inter"
+                    android:stateListAnimator="@null"
+                    android:text="Stop"
+                    android:textAllCaps="false"
+                    android:textColor="@color/text_primary"
+                    android:textFontWeight="600"
+                    android:textSize="20sp" />
+
+                <Button
+                    android:id="@+id/keepBtn"
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/btn_primary"
+                    android:fontFamily="@font/inter"
+                    android:stateListAnimator="@null"
+                    android:text="Keep watching"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    android:textFontWeight="600"
+                    android:textSize="20sp" />
+            </LinearLayout>
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- ===== Settings (8.4): D-pad only, plain language ===== -->
+    <FrameLayout
+        android:id="@+id/settingsLayer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_ambient"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:paddingStart="48dp"
+        android:paddingTop="24dp"
+        android:paddingEnd="48dp"
+        android:paddingBottom="24dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="560dp"
+            android:layout_height="match_parent"
+            android:layout_gravity="center_horizontal"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:gravity="center_vertical"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/settingsTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/inter"
+                android:text="Settings"
+                android:textColor="@color/text_primary"
+                android:textFontWeight="700"
+                android:textSize="34sp" />
+
+            <LinearLayout
+                android:id="@+id/rowPaired"
+                style="@style/SettingsRow"
+                android:layout_marginTop="22dp">
+
+                <TextView
+                    style="@style/RowTitle"
+                    android:text="Paired PCs" />
+
+                <TextView
+                    android:id="@+id/rowPairedSub"
+                    style="@style/RowSub" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/rowAbout"
+                style="@style/SettingsRow">
+
+                <TextView
+                    style="@style/RowTitle"
+                    android:text="About" />
+
+                <TextView
+                    android:id="@+id/rowAboutSub"
+                    style="@style/RowSub" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/rowDiag"
+                style="@style/SettingsRow">
+
+                <TextView
+                    style="@style/RowTitle"
+                    android:text="Diagnostics" />
+
+                <TextView
+                    android:id="@+id/rowDiagSub"
+                    style="@style/RowSub" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/settingsClose"
+                android:layout_width="wrap_content"
+                android:layout_height="52dp"
+                android:layout_marginTop="22dp"
+                android:background="@drawable/btn_secondary"
+                android:fontFamily="@font/inter"
+                android:minWidth="150dp"
+                android:paddingStart="28dp"
+                android:paddingEnd="28dp"
+                android:stateListAnimator="@null"
+                android:text="Back"
+                android:textAllCaps="false"
+                android:textColor="@color/text_primary"
+                android:textFontWeight="600"
+                android:textSize="18sp" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- Minimal streaming status (8.3): appears on input, hides itself -->
+    <TextView
+        android:id="@+id/hud"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:layout_margin="28dp"
+        android:background="@drawable/chip"
+        android:fontFamily="@font/inter"
+        android:paddingStart="20dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="10dp"
+        android:textColor="@color/text_primary"
+        android:textFontWeight="500"
+        android:textSize="17sp"
+        android:visibility="gone" />
 </FrameLayout>
