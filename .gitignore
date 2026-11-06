@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.h264
+*.log
+receiver/.gradle/
+receiver/build/
+receiver/app/build/
+receiver/local.properties
+.idea/

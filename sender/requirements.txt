@@ -1,0 +1,4 @@
+dxcam==0.3.0
+numpy==2.4.6
+comtypes==1.4.17
+pytest==9.2.0
