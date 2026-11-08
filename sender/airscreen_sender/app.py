@@ -371,14 +371,18 @@ def run() -> int:
     api.window = window
 
     def dark_titlebar() -> None:
-        """Native title bar (spec 4.1), themed dark to match the sidebar (Windows 10 20H1+/11)."""
+        """Title bar: dark, and translucent (Windows 11 Mica) so the desktop shows through it; plain near-black elsewhere."""
         try:
             import ctypes
             hwnd = window.native.Handle.ToInt32()
             dwm = ctypes.windll.dwmapi
             dwm.DwmSetWindowAttribute(hwnd, 20, ctypes.byref(ctypes.c_int(1)), 4)            # immersive dark mode
-            dwm.DwmSetWindowAttribute(hwnd, 35, ctypes.byref(ctypes.c_int(0x0022120D)), 4)   # caption colour #0D1222 (BGR)
-            dwm.DwmSetWindowAttribute(hwnd, 36, ctypes.byref(ctypes.c_int(0x00D0BDB3)), 4)   # caption text #B3BDD0
+            dwm.DwmSetWindowAttribute(hwnd, 35, ctypes.byref(ctypes.c_uint(0xFFFFFFFF)), 4)  # caption colour: system default (lets Mica show)
+            dwm.DwmSetWindowAttribute(hwnd, 36, ctypes.byref(ctypes.c_int(0x00E6E6E6)), 4)   # caption text
+            # DWMWA_SYSTEMBACKDROP_TYPE = 38; 2 = Mica, 3 = acrylic, 4 = Mica Alt (Windows 11 22621+)
+            hr = dwm.DwmSetWindowAttribute(hwnd, 38, ctypes.byref(ctypes.c_int(3)), 4)
+            if hr != 0:                                                                       # older Windows: match the page instead
+                dwm.DwmSetWindowAttribute(hwnd, 35, ctypes.byref(ctypes.c_int(0x000C0B0A)), 4)
         except Exception:
             pass
 
