@@ -18,3 +18,7 @@ rx_state.json
 build/
 dist/
 *.spec
+!scripts/*.spec
+installer/
+
+dist_rel/

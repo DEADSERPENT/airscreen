@@ -33,6 +33,18 @@ def build_command(cfg: Config, src_w: int, src_h: int) -> list[str]:
             "-bf", "0", "-refs", "1", "-delay", "0", "-rc-lookahead", "0", "-g", str(cfg.fps),
             "-forced-idr", "1", "-zerolatency", "1",
         ]
+    elif cfg.encoder == "h264_amf":   # AMD
+        cmd += [
+            "-usage", "ultralowlatency", "-quality", "speed", "-profile:v", "high", "-rc", "cbr",
+            "-b:v", f"{cfg.bitrate_kbps}k", "-maxrate", f"{cfg.bitrate_kbps}k",
+            "-bufsize", f"{cfg.bitrate_kbps // cfg.fps * 2}k", "-bf", "0", "-g", str(cfg.fps),
+        ]
+    elif cfg.encoder == "h264_qsv":   # Intel
+        cmd += [
+            "-preset", "veryfast", "-profile:v", "high", "-look_ahead", "0", "-async_depth", "1",
+            "-b:v", f"{cfg.bitrate_kbps}k", "-maxrate", f"{cfg.bitrate_kbps}k",
+            "-bf", "0", "-g", str(cfg.fps),
+        ]
     else:  # libx264, only reachable with allow_cpu_fallback
         cmd += [
             "-preset", "ultrafast", "-tune", "zerolatency", "-profile:v", "high",

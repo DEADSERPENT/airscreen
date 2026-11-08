@@ -102,7 +102,7 @@ class StreamServer(
             listener.onConnected(c.remoteSocketAddress.toString().trimStart('/'))
 
             val headerBytes = ByteArray(Protocol.HEADER_SIZE)
-            val cipher = authenticate(input, out, headerBytes)
+            val cipher = authenticate(c, input, out, headerBytes)
             c.soTimeout = READ_TIMEOUT_MS // a silent sender must not hold the receiver forever
 
             var expectedSeq = 0L
@@ -155,10 +155,19 @@ class StreamServer(
     }
 
     // --- authentication (mirrors networking/tcp_sender.py: handshake) ---
-    private fun authenticate(input: DataInputStream, out: OutputStream, headerBytes: ByteArray): Crypto.MediaCipher {
+    private fun authenticate(c: Socket, input: DataInputStream, out: OutputStream, headerBytes: ByteArray): Crypto.MediaCipher {
+        // One deadline for the whole handshake: a per-read timeout alone lets a client drip one byte at a time forever.
+        var deadline = System.nanoTime() + HANDSHAKE_TOTAL_MS * 1_000_000L
+        fun arm() {
+            val left = (deadline - System.nanoTime()) / 1_000_000L
+            if (left <= 0) throw SocketTimeoutException("handshake too slow")
+            c.soTimeout = minOf(left, HANDSHAKE_TIMEOUT_MS.toLong()).toInt()
+        }
+        arm()
         input.readFully(headerBytes)
         val h1 = Protocol.parseHeader(headerBytes)
         if (h1.type != Protocol.TYPE_AUTH_REQUEST) throw Protocol.ProtocolException("expected authentication first")
+        arm()
         val req = JSONObject(String(ByteArray(h1.length).also { input.readFully(it) }, Charsets.UTF_8))
         val deviceId = req.getString("device_id")
         if (!DEVICE_ID_REGEX.matches(deviceId)) throw Protocol.ProtocolException("bad device id")
@@ -174,9 +183,11 @@ class StreamServer(
         if (eph != null) challenge.put("rpub", Crypto.hex(eph.second))
         send(out, Protocol.TYPE_AUTH_CHALLENGE, 0, challenge)
 
+        arm()
         input.readFully(headerBytes)
         val h2 = Protocol.parseHeader(headerBytes)
         if (h2.type != Protocol.TYPE_AUTH_PROOF) throw Protocol.ProtocolException("expected proof")
+        arm()
         val proof = JSONObject(String(ByteArray(h2.length).also { input.readFully(it) }, Charsets.UTF_8))
         val mode = proof.getString("mode")
 
@@ -193,9 +204,9 @@ class StreamServer(
             if (peer.size != 65) throw Protocol.ProtocolException("bad key")
             val shared = Crypto.ecdh(e.first, peer)
             val verify = Crypto.sas(shared, ns, nr)                    // the PC shows the same number: a mismatch means someone is in the middle
-            if (!listener.onPairRequest(sanitizeName(req.optString("name", "PC")), verify)) {
-                fail(out, "The TV did not approve this request")
-            }
+            val approved = listener.onPairRequest(sanitizeName(req.optString("name", "PC")), verify)
+            deadline = System.nanoTime() + HANDSHAKE_TOTAL_MS * 1_000_000L   // the person took their time; the rest is quick
+            if (!approved) fail(out, "The TV did not approve this request")
             send(out, Protocol.TYPE_AUTH_OK, 1, JSONObject().put("proof", Crypto.hex(Crypto.serverProof(shared, ns, nr))))
             trust.trust(deviceId, Crypto.deviceKey(shared, ns, nr))
             pairing.rotate()                                           // a pair key is single-use
@@ -206,8 +217,7 @@ class StreamServer(
         val secret = trustedKey ?: fail(out, "this device is not paired")
         val expected = Crypto.clientProof(secret, ns, nr, deviceId)
         if (!MessageDigest.isEqual(expected, Crypto.unhex(proof.getString("proof")))) {
-            trust.revoke(deviceId)
-            fail(out, "authentication failed")
+            fail(out, "authentication failed")        // keep the stored key: a failed proof is not proof the PC is gone
         }
         send(out, Protocol.TYPE_AUTH_OK, 1, JSONObject().put("proof", Crypto.hex(Crypto.serverProof(secret, ns, nr))))
         return Crypto.MediaCipher(Crypto.sessionKey(secret, ns, nr))
@@ -269,6 +279,7 @@ class StreamServer(
     companion object {
         const val DEFAULT_PORT = 5000
         private const val HANDSHAKE_TIMEOUT_MS = 10_000
+        private const val HANDSHAKE_TOTAL_MS = 15_000L
         private const val READ_TIMEOUT_MS = 5000
         private const val TAG_BYTES = 16
         private val DEVICE_ID_REGEX = Regex("^[A-Za-z0-9]{1,64}$")

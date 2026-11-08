@@ -1,6 +1,7 @@
 package com.airscreen.decoder
 
 import android.media.MediaCodec
+import android.media.MediaCodecList
 import android.media.MediaFormat
 import android.os.Build
 import android.util.Log
@@ -20,6 +21,7 @@ class VideoDecoder(
     pps: ByteArray?,
     codecName: String? = null,
     private val onFirstFrame: () -> Unit,
+    private val onFailure: (String) -> Unit = {},
 ) {
     private val codec: MediaCodec
     private val outputThread: Thread
@@ -40,26 +42,55 @@ class VideoDecoder(
         private set
 
     init {
-        val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, width, height)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) format.setInteger(MediaFormat.KEY_LOW_LATENCY, 1)
-        format.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 2 * 1024 * 1024)
-        // real-time hints: priority 0 = real time; a high operating rate asks the decoder not to pace/buffer for 30 fps
-        format.setInteger(MediaFormat.KEY_PRIORITY, 0)
-        format.setInteger(MediaFormat.KEY_OPERATING_RATE, 120)
-        // Hardware decoders (this TV's Realtek one) want the parameter sets up front, not only inline.
-        if (sps != null) format.setByteBuffer("csd-0", ByteBuffer.wrap(sps))
-        if (pps != null) format.setByteBuffer("csd-1", ByteBuffer.wrap(pps))
-        Log.i(TAG, "configure ${width}x$height csd0=${sps?.size} csd1=${pps?.size}")
-        try {
-            codec = if (codecName.isNullOrEmpty()) MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
-                    else MediaCodec.createByCodecName(codecName)
-            Log.i(TAG, "decoder in use: ${codec.name}")
-            StreamStats.decoderName = codec.name
-            codec.configure(format, surface, null, 0)
-            codec.start()
-        } catch (e: Exception) {
-            throw IOException("H.264 decoder unavailable: ${e.message}", e)
+        // Different TVs ship very different H.264 decoders. Try the best decoder for this stream first, then the others
+        // (hardware before software), each with progressively plainer settings, until one configures and starts.
+        fun makeFormat(level: Int): MediaFormat {
+            val f = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, width, height)
+            if (level <= 0) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) f.setInteger(MediaFormat.KEY_LOW_LATENCY, 1)
+                f.setInteger(MediaFormat.KEY_PRIORITY, 0)
+                f.setInteger(MediaFormat.KEY_OPERATING_RATE, 120)
+            }
+            if (level <= 1) f.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 2 * 1024 * 1024)
+            if (level <= 2) {
+                if (sps != null) f.setByteBuffer("csd-0", ByteBuffer.wrap(sps))
+                if (pps != null) f.setByteBuffer("csd-1", ByteBuffer.wrap(pps))
+            }
+            return f
         }
+
+        val names = LinkedHashSet<String>()
+        if (!codecName.isNullOrEmpty()) names += codecName
+        try { MediaCodecList(MediaCodecList.REGULAR_CODECS).findDecoderForFormat(makeFormat(2))?.let { names += it } } catch (_: Exception) {}
+        val infos = try {
+            MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
+                .filter { !it.isEncoder && it.supportedTypes.any { t -> t.equals(MediaFormat.MIMETYPE_VIDEO_AVC, true) } && !it.name.endsWith(".secure") }
+        } catch (_: Exception) { emptyList() }
+        infos.filter { isHardware(it) }.forEach { names += it.name }
+        infos.filter { !isHardware(it) }.forEach { names += it.name }
+        val usable = names.filter { it !in badDecoders }.ifEmpty { badDecoders.clear(); names.toList() }
+
+        var created: MediaCodec? = null
+        var lastError: Exception? = null
+        loop@ for (name in usable) {
+            for (level in 0..3) {
+                var c: MediaCodec? = null
+                try {
+                    c = MediaCodec.createByCodecName(name)
+                    c.configure(makeFormat(level), surface, null, 0)
+                    c.start()
+                    created = c
+                    Log.i(TAG, "decoder in use: $name (settings level $level) ${width}x$height csd0=${sps?.size} csd1=${pps?.size}")
+                    break@loop
+                } catch (e: Exception) {
+                    lastError = e
+                    Log.w(TAG, "decoder $name level $level failed: ${e.message}")
+                    try { c?.release() } catch (_: Exception) {}
+                }
+            }
+        }
+        codec = created ?: throw IOException("No H.264 decoder on this TV could start: ${lastError?.message}", lastError)
+        StreamStats.decoderName = codec.name
         outputThread = Thread({ drainOutput() }, "airscreen-decoder-out").also { it.start() }
     }
 
@@ -91,9 +122,17 @@ class VideoDecoder(
             if (queuedAt.size > 256) queuedAt.clear()   // bounded: never leak if frames are dropped
             codec.queueInputBuffer(index, 0, data.size, ptsUs, 0)
         } catch (e: IllegalStateException) {
-            // Codec stopped underneath us (session ended / surface lost).
-            running = false
+            fail("decoder stopped (${e.message})")
         }
+    }
+
+    /** The codec died underneath us (not a normal stop): tell the owner so it can recreate the decoder on the next keyframe. */
+    private fun fail(reason: String) {
+        if (!running) return
+        running = false
+        Log.w(TAG, "decoder failed: $reason")
+        recordFailure(codec.name)
+        try { onFailure(reason) } catch (_: Exception) {}
     }
 
     private fun dropUntilKeyframe() {
@@ -120,6 +159,7 @@ class VideoDecoder(
                     }
                 }
             } catch (e: IllegalStateException) {
+                if (running) fail("decoder output failed (${e.message})")
                 break
             }
         }
@@ -149,6 +189,23 @@ class VideoDecoder(
 
     companion object {
         private const val TAG = "AirScreenDecoder"
+        private val badDecoders = java.util.concurrent.CopyOnWriteArraySet<String>()
+        private val failureTimes = java.util.concurrent.ConcurrentHashMap<String, MutableList<Long>>()
+
+        private fun isHardware(info: android.media.MediaCodecInfo): Boolean =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) info.isHardwareAccelerated
+            else !(info.name.startsWith("OMX.google.") || info.name.startsWith("c2.android."))
+
+        /** Two failures of the same decoder within 30 s: stop picking it first, so another decoder gets a turn. */
+        private fun recordFailure(name: String) {
+            val now = System.currentTimeMillis()
+            val list = failureTimes.getOrPut(name) { mutableListOf() }
+            synchronized(list) {
+                list.removeAll { now - it > 30_000 }
+                list += now
+                if (list.size >= 2) badDecoders += name
+            }
+        }
 
         /** Pulls the SPS (NAL 7) and PPS (NAL 8) out of an Annex B access unit, each with a 4-byte start code. */
         fun parameterSets(au: ByteArray): Pair<ByteArray?, ByteArray?> {

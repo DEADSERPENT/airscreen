@@ -105,10 +105,16 @@ class StreamSession:
         speakers = None
         try:
             self._status("Checking encoder...")
-            if cfg.encoder == "h264_nvenc":
-                chk = preflight.check_nvenc(cfg.ffmpeg_path)
+            if cfg.encoder == "auto":
+                chosen, results = preflight.pick_encoder(cfg.ffmpeg_path)
+                if chosen is None:
+                    detail = "; ".join(f"{c.name}: {c.detail}" for c in results)
+                    raise RuntimeError("No supported GPU video encoder found (NVIDIA NVENC, AMD AMF or Intel QSV). " + detail)
+                cfg = dataclasses.replace(cfg, encoder=chosen)
+            elif cfg.encoder in preflight.HW_ENCODERS:
+                chk = preflight.check_encoder(cfg.ffmpeg_path, cfg.encoder)
                 if not chk.ok:
-                    raise RuntimeError(f"NVENC unavailable: {chk.detail}")
+                    raise RuntimeError(f"{cfg.encoder} unavailable: {chk.detail}")
             # Connect first (cheap to fail/retry), then start the heavy pipelines.
             self._status(f"Connecting to {cfg.receiver_ip}:{cfg.receiver_port}...")
             capture = DesktopCapture(cfg.monitor, cfg.cursor)
@@ -185,9 +191,12 @@ class StreamSession:
             while not self._stop.is_set():
                 if net.error:
                     raise Transient(f"Connection lost ({net.error})")
-                frame = capture.grab()
-                cap_times.append(time.monotonic())
-                encoder.write_frame(frame)
+                try:
+                    frame = capture.grab()
+                    cap_times.append(time.monotonic())
+                    encoder.write_frame(frame)
+                except RuntimeError as e:        # capture lost (lock screen / mode change) or encoder died: restart the pipeline
+                    raise Transient(f"Capture or encoder stopped ({e})") from e
                 next_t += interval
                 delay = next_t - time.monotonic()
                 if delay > 0:

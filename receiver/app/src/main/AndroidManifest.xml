@@ -19,7 +19,9 @@
             android:name=".ui.MainActivity"
             android:exported="true"
             android:configChanges="orientation|screenSize|keyboard|keyboardHidden|navigation"
-            android:launchMode="singleTask">
+            android:launchMode="singleTask"
+            android:banner="@drawable/banner"
+            android:icon="@drawable/brand_logo">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

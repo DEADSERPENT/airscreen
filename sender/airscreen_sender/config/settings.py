@@ -49,7 +49,7 @@ class Config:
     mute_pc_audio: bool = True  # sound plays on the TV only while streaming
     reconnect: bool = True      # keep retrying after a network interruption
     ffmpeg_path: str = "ffmpeg"
-    encoder: str = "h264_nvenc"
+    encoder: str = "auto"   # auto = first working of NVENC (NVIDIA), AMF (AMD), QSV (Intel)
     allow_cpu_fallback: bool = False  # never fall back to CPU encoding silently
 
     def validate(self) -> "Config":
@@ -68,7 +68,7 @@ class Config:
             raise ConfigError(f"bitrate_kbps out of range: {self.bitrate_kbps}")
         if not (32 <= self.audio_bitrate_kbps <= 510):
             raise ConfigError(f"audio_bitrate_kbps out of range: {self.audio_bitrate_kbps}")
-        if self.encoder not in ("h264_nvenc", "libx264"):
+        if self.encoder not in ("auto", "h264_nvenc", "h264_amf", "h264_qsv", "libx264"):
             raise ConfigError(f"unsupported encoder: {self.encoder}")
         if self.encoder == "libx264" and not self.allow_cpu_fallback:
             raise ConfigError("libx264 (CPU) requires allow_cpu_fallback=true")

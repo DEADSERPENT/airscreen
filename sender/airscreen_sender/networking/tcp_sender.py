@@ -65,15 +65,17 @@ def handshake(sock: socket.socket, store: TrustStore, pair_key: str | None,
 
     key = store.get_key(rid)
     if key is not None and not ch.get("trusted"):
-        store.revoke(rid)  # the TV forgot us (revoked or reinstalled): pair again
-        key = None
+        key = None  # the TV forgot us (revoked or reinstalled): pair again. The stored key is only replaced once
+        #            pairing succeeds; an unauthenticated peer must never be able to make us delete it.
 
     if key is not None:  # ---- already paired
         sock.sendall(pack_message(TYPE_AUTH_PROOF, 1, 0, json.dumps(
             {"mode": "trusted", "proof": crypto.client_proof(key, ns, nr, store.device_id).hex()}).encode()))
         typ, ok = _read_control(sock, (TYPE_AUTH_OK, TYPE_AUTH_FAIL))
         if typ == TYPE_AUTH_FAIL:
-            store.revoke(rid)
+            # Keep the stored key (a rogue peer could send this); ask the user to pair again instead.
+            if not pair_key:
+                raise PairingRequired(rid, rname)
             raise AuthError(ok.get("reason", "authentication failed"))
         if not hmac.compare_digest(bytes.fromhex(ok["proof"]), crypto.server_proof(key, ns, nr)):
             raise AuthError("receiver failed to prove its identity")

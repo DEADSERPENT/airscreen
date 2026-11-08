@@ -43,6 +43,38 @@ def check_nvenc(ffmpeg: str = "ffmpeg") -> Check:
     return Check("h264_nvenc", True, "encoder opened successfully")
 
 
+HW_ENCODERS = ("h264_nvenc", "h264_amf", "h264_qsv")      # tried in this order by "auto"
+
+
+def check_encoder(ffmpeg: str, name: str) -> Check:
+    """Actually open the encoder on a tiny synthetic input: being listed by FFmpeg does not prove the GPU can run it."""
+    path = shutil.which(ffmpeg)
+    if not path:
+        return Check(name, False, "ffmpeg missing")
+    if name not in _run([path, "-hide_banner", "-encoders"]):
+        return Check(name, False, f"this FFmpeg build has no {name}")
+    try:
+        p = subprocess.run([path, "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=black:s=256x256:d=0.2",
+                            "-vf", "format=nv12", "-c:v", name, "-f", "null", "-"], capture_output=True, text=True, timeout=30,
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    except subprocess.TimeoutExpired:
+        return Check(name, False, "encoder test timed out")
+    if p.returncode != 0:
+        return Check(name, False, (p.stderr.strip() or "encoder failed to open")[:300])
+    return Check(name, True, "encoder opened successfully")
+
+
+def pick_encoder(ffmpeg: str) -> tuple[str | None, list[Check]]:
+    """First hardware encoder that really works on this PC (NVIDIA, then AMD, then Intel), plus every result for diagnostics."""
+    results = []
+    for name in HW_ENCODERS:
+        c = check_encoder(ffmpeg, name)
+        results.append(c)
+        if c.ok:
+            return name, results
+    return None, results
+
+
 def check_gpu() -> Check:
     smi = shutil.which("nvidia-smi")
     if not smi:

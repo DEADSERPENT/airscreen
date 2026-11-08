@@ -367,9 +367,9 @@ class MainActivity : Activity(), SurfaceHolder.Callback, StreamServer.Listener {
                     if (n == 0) "A PC appears here after you pair it." else "Press OK to forget all paired PCs.")
             }
             1 -> setDetail("Diagnostics", diagRows(), "“Reported” comes from this TV. “Measured” comes from your last stream.")
-            else -> setDetail("About", listOf("Version" to "AirScreen ${versionName()}", "Protocol" to "v${Protocol.VERSION}",
+            else -> setDetail("About", listOf("Version" to "AirScreen ${versionName()}", "Developer" to "Deadserpent Corporation", "Protocol" to "v${Protocol.VERSION}",
                 "Device" to "${Build.MANUFACTURER} ${Build.MODEL}", "Android" to "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})"),
-                "No account, no cloud, no telemetry.")
+                "© 2026 Deadserpent Corporation. No account, no cloud, no telemetry.")
         }
     }
 
@@ -461,10 +461,15 @@ class MainActivity : Activity(), SurfaceHolder.Callback, StreamServer.Listener {
                 val h = pendingHello ?: return
                 val s = surface ?: throw IOException("no display surface")
                 val (sps, pps) = VideoDecoder.parameterSets(data)
-                decoder = VideoDecoder(s, h.width, h.height, sps, pps, decoderOverride) {
+                decoder = VideoDecoder(s, h.width, h.height, sps, pps, decoderOverride, {
                     // the first decoded frame is on screen: only now is it truthful to say "streaming"
                     ui.post { show(Layer.STREAMING); showHud() }
-                }
+                }, { _ ->
+                    // The decoder died mid-stream: drop it (off the decoder's own thread); a fresh one starts on the next keyframe.
+                    Thread {
+                        synchronized(mediaLock) { decoder?.stop(); decoder = null }
+                    }.start()
+                })
             }
             decoder
         }?.queue(data, ptsUs, keyframe)

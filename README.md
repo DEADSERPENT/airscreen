@@ -1,30 +1,47 @@
 # AirScreen
 
-Mirror a Windows desktop to an Android/Google TV over the local network: NVENC H.264 video + Opus system audio,
-encrypted, paired by approving on the TV, quality negotiated automatically from what the TV reports.
-See `AirScreen_Complete_Development_Blueprint.md` and `shared/protocol/PROTOCOL.md`.
+Mirror your Windows screen to an Android TV / Google TV over your own network. Low-latency H.264 (NVIDIA NVENC) video,
+Opus system audio, AES-256-GCM encryption, and pairing that you approve on the TV. No account, no cloud, no telemetry.
 
-## Sender (Windows)
+By **Deadserpent Corporation** · MIT licensed
+
+## Get it
+Download from the [Releases](../../releases) page:
+- **AirScreen-Setup-x.y.z.exe** - Windows installer (appears in Apps & features, uninstallable).
+- **AirScreen-TV.apk** - install on the TV (`adb connect <TV_IP>` then `adb install -r AirScreen-TV.apk`).
+
+## Use it
+1. Open AirScreen on the TV. It shows a **pair key**.
+2. Open AirScreen on the PC, choose the TV (or type the key), press **Start streaming**.
+3. First time only: confirm the same 4-digit number on both screens and press **Allow** on the TV. Next time it just connects.
+
+## Requirements
+- **PC:** Windows 10/11 with an NVIDIA GPU (NVENC). The installer includes FFmpeg.
+- **TV:** Android TV / Google TV, Android 8+, H.264 hardware decoder, on the same network (5 GHz Wi-Fi or Ethernet recommended).
+
+## Build from source
 ```
-cd sender
-python -m venv .venv && .venv\Scripts\activate && pip install -r requirements.txt
-python -m airscreen_sender --preflight --ffmpeg C:\ffmpeg\ffmpeg.exe
-python -m airscreen_sender                 # GUI: Find TVs, pick one, Connect
-python -m airscreen_sender --discover      # list TVs on the network
-python -m airscreen_sender --ip <TV_IP> [--code XXX-XXX]   # pair key shown on the TV, first time only; then approve on the TV
+# Windows app
+cd sender && python -m venv .venv && .venv\Scripts\activate && pip install -r requirements.txt pyinstaller
 python -m pytest tests
+python -m airscreen_sender                 # run
+cd .. && pyinstaller scripts/AirScreen.spec --noconfirm
+iscc scripts\AirScreen.iss                 # installer -> installer\ (needs Inno Setup 6 and an ffmpeg.exe)
+
+# TV app
+cd receiver && gradlew assembleDebug testDebugUnitTest
 ```
-Quality is automatic. `--size 1920x1080 --fps 60 --bitrate 20000` switches to manual. `--no-audio`, `--no-cursor`, `--no-reconnect` are available.
+Headless sender: `python -m airscreen_sender --ip <TV_IP> [--code XXX-XXX]`, `--discover`, `--preflight`.
 
-## Receiver (TV)
-Open `receiver/` in Android Studio (it generates the Gradle wrapper), build, then
-`adb connect <TV_IP>` and `adb install -r app/build/outputs/apk/debug/app-debug.apk`. Launch AirScreen on the TV:
-it shows its IP, port 5000 and a pair key. On the PC enter the key (or pick the TV), then press Allow on the TV. Back = disconnect, Menu = forget all paired PCs.
+## How it works
+DXcam capture → FFmpeg (NVENC H.264, WASAPI loopback → Opus) → encrypted TCP → Android MediaCodec. Wire protocol:
+`shared/protocol/PROTOCOL.md`. Security model and open items: `SECURITY.md`, `docs/SECURITY_NOTES.md`.
 
-## Testing without a TV
-`python tools/test_receiver.py logs/out.h264 --state logs/rx_state.json`, then run the sender with `--ip 127.0.0.1 --code <printed code>`.
-Test runs, logs and captures go in `logs/` (git-ignored).
+## Known limits (be honest with users)
+- Windows sender needs an NVIDIA GPU today; AMD/Intel encoders and macOS/Linux senders are not implemented.
+- Plain TCP transport, 1080p30-class quality over typical Wi-Fi; no live resolution adaptation yet.
+- The TV APK is debug-signed (sideload). The Windows installer is not code-signed, so SmartScreen may warn.
+- Tested on one TV (Sony BRAVIA VU31) and one PC; please report hardware results in Issues.
 
-## Known limits
-- Capture goes DXcam -> pipe -> FFmpeg, which caps raw throughput (~1440p30, 1080p60). A GPU capture path is a later milestone.
-- The Android app has not been compiled or run on hardware yet. Plain-TCP transport; WebRTC, HEVC, HDR, multiple receivers are later milestones.
+## Contributing / security
+See `CONTRIBUTING.md` and `SECURITY.md`. Third-party licenses: `THIRD_PARTY_NOTICES.md`.

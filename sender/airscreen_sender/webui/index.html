@@ -15,7 +15,7 @@
   <!-- ORBIT: floating top navigation, no sidebar -->
   <header class="topbar">
     <div class="brand">
-      <img src="logo.png" alt="" class="brand-logo" width="34" height="34">
+      <img src="brand-logo.png?v=2" alt="" class="brand-logo" width="52" height="52">
       <b>AirScreen</b>
       <span class="pcname" id="pcname">This PC</span>
     </div>
@@ -35,8 +35,7 @@
     <section class="view active" id="view-cast" aria-labelledby="h-cast">
       <div class="stage">
         <div class="hero3d" aria-hidden="true">
-          <img src="icons/icon-device-tv@256.png" alt="" width="132" height="132">
-          <img class="hero-wifi" src="icons/icon-network-wifi@128.png" alt="" width="54" height="54">
+          <img class="herologo" src="brand-logo.png?v=2" alt="" width="280" height="280">
         </div>
         <h1 id="h-cast">Cast your screen</h1>
         <p class="sub">Your display on the TV, securely, over your own network.</p>
@@ -63,7 +62,7 @@
 
         <button class="btn primary lg orb" id="cta" aria-live="polite">
           <span class="spin" aria-hidden="true"></span>
-          <img class="i3d orbicon" src="icons/icon-nav-streaming@128.png" alt="">
+          <img class="i3d orbicon" src="brand-logo.png?v=2" alt="">
           <span id="ctalabel">Start streaming</span>
         </button>
         <div class="err" id="casterr" role="alert"></div>
@@ -176,10 +175,11 @@
     <!-- ============ ABOUT ============ -->
     <section class="view" id="view-about" aria-labelledby="h-about">
       <div class="col">
-        <header class="head"><div><h1 id="h-about">About</h1><p class="sub">AirScreen <span id="aboutver"></span> · protocol v<span id="aboutproto"></span></p></div><button class="btn secondary" id="rerun">Run checks again</button></header>
+        <header class="head"><div><h1 id="h-about">About</h1><p class="sub">AirScreen <span id="aboutver"></span> · protocol v<span id="aboutproto"></span> · Deadserpent Corporation</p></div><button class="btn secondary" id="rerun">Run checks again</button></header>
         <section class="setgroup card" aria-labelledby="g-chk"><h2 id="g-chk">Diagnostics</h2><div id="checks" class="checks"><div class="muted">Running checks…</div></div></section>
         <section class="setgroup card" aria-labelledby="g-priv"><h2 id="g-priv">Privacy</h2>
-          <p class="body">No account, no cloud, no telemetry. Your screen and audio stay on your local network, encrypted. A TV is trusted only after you approve it with a one-time code.</p></section>
+          <p class="body">No account, no cloud, no telemetry. Your screen and audio stay on your local network, encrypted. A TV is trusted only after you approve it with a one-time code.</p>
+          <p class="body muted small">© 2026 Deadserpent Corporation. All rights reserved.</p></section>
       </div>
     </section>
   </main>

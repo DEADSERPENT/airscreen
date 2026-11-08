@@ -32,6 +32,53 @@ def ui_dir() -> Path:
     return base / "webui" if (base / "webui").exists() else Path(__file__).resolve().parent / "webui"
 
 
+_crash_file = None
+
+
+def install_diagnostics(api_ref: list) -> None:
+    """Crash + hang evidence for a windowed exe that has no console: native crashes, uncaught exceptions
+    (any thread) and a watchdog that dumps every thread's stack if the UI stops polling for 10 s."""
+    import faulthandler
+    import traceback
+    global _crash_file
+    try:
+        _crash_file = open(data_dir() / "crash.log", "a", buffering=1, encoding="utf-8")
+        _crash_file.write(f"\n--- {time.strftime('%Y-%m-%d %H:%M:%S')} AirScreen {__version__} start ---\n")
+        faulthandler.enable(_crash_file, all_threads=True)
+    except OSError:
+        return
+
+    def note(kind: str, exc_type, exc, tb) -> None:
+        text = "".join(traceback.format_exception(exc_type, exc, tb))
+        try:
+            _crash_file.write(f"{time.strftime('%H:%M:%S')} {kind}\n{text}")
+            if api_ref:
+                api_ref[0].log(f"{kind}: {exc_type.__name__}: {exc}")
+        except Exception:
+            pass
+
+    sys.excepthook = lambda t, e, tb: note("Uncaught error", t, e, tb)
+    threading.excepthook = lambda a: note(f"Thread {getattr(a.thread, 'name', '?')} failed", a.exc_type, a.exc_value, a.exc_traceback)
+
+    def watchdog() -> None:
+        dumped = False
+        while True:
+            time.sleep(2)
+            api = api_ref[0] if api_ref else None
+            if not api or not api.window_ready:
+                continue
+            stale = time.monotonic() - api.last_poll
+            if stale > 10 and not dumped:
+                dumped = True
+                _crash_file.write(f"{time.strftime('%H:%M:%S')} UI not polling for {stale:.0f}s: thread dump\n")
+                faulthandler.dump_traceback(_crash_file, all_threads=True)
+                api.log(f"UI stopped responding for {stale:.0f}s (thread dump in crash.log)")
+            elif stale <= 10:
+                dumped = False
+
+    threading.Thread(target=watchdog, name="watchdog", daemon=True).start()
+
+
 DEFAULT_SETTINGS = {
     "resolution": "auto",  # auto | 1280x720 | 1920x1080 | 2560x1440 | source
     "fps": "auto",         # auto | 30 | 60
@@ -68,6 +115,8 @@ class Api:
         self.history: deque[float] = deque(maxlen=60)
         self._ssid, self._ssid_at = "", 0.0
         self._lock = threading.Lock()
+        self.last_poll = time.monotonic()   # UI heartbeat for the hang watchdog
+        self.window_ready = False
         self._log_file = data_dir() / "airscreen.log"
         self.log("AirScreen %s started (protocol v%d)" % (__version__, PROTOCOL_VERSION))
 
@@ -97,6 +146,7 @@ class Api:
 
     # ---- state for the UI ----
     def state(self) -> dict:
+        self.last_poll = time.monotonic()
         s = self.session
         if s and not s.running:
             if s.pairing_required:
@@ -231,6 +281,15 @@ class Api:
         threading.Thread(target=work, daemon=True).start()
         return {"ok": True}
 
+    def shutdown(self) -> None:
+        """Stop the stream and give the PC its sound back BEFORE the process exits (ffmpeg children, WASAPI, mute)."""
+        s, self.session = self.session, None
+        if s:
+            try:
+                s.stop()
+            except Exception as e:
+                self.log(f"Shutdown: {e}")
+
     def disconnect(self) -> None:
         s, self.session = self.session, None
         if s:
@@ -268,7 +327,7 @@ class Api:
     def checks(self) -> list:
         ff = resolve_ffmpeg()
         out = []
-        for c in (preflight.check_ffmpeg(ff), preflight.check_gpu(), preflight.check_nvenc(ff)):
+        for c in [preflight.check_ffmpeg(ff)] + [preflight.check_encoder(ff, n) for n in preflight.HW_ENCODERS]:
             out.append({"name": c.name, "ok": c.ok, "detail": c.detail})
         return out
 
@@ -286,17 +345,27 @@ class Api:
                 w.maximize()
             self._maxed = not getattr(self, "_maxed", False)
         elif action == "close":
-            self.disconnect()
-            w.destroy()
+            w.destroy()          # the window's closing handler stops the stream first
 
 
 def run() -> int:
     from .audio.speaker_mute import SpeakerMute
+    api_ref: list = []
+    install_diagnostics(api_ref)
     SpeakerMute.recover()      # undo a mute left by a crashed previous run
     api = Api()
+    api_ref.append(api)
     index = ui_dir() / "index.html"
+    # pywebview walks every attribute of js_api (recursing into window.native WinForms/COM objects off the UI thread,
+    # which spams errors and stalls the UI), so hand it a bridge that carries only the callable methods.
+    class _Bridge:
+        pass
+    bridge = _Bridge()
+    for name in ("state", "scan", "connect", "connect_by_key", "disconnect", "set_muted", "save_settings", "forget",
+                 "get_logs", "open_data_folder", "checks", "win"):
+        setattr(bridge, name, getattr(api, name))
     window = webview.create_window(
-        "AirScreen", url=str(index), js_api=api, width=1180, height=760, min_size=(980, 640),
+        "AirScreen", url=str(index), js_api=bridge, width=1180, height=760, min_size=(980, 640),
         background_color="#080B16",
     )
     api.window = window
@@ -313,14 +382,38 @@ def run() -> int:
         except Exception:
             pass
 
+    def set_window_icon() -> None:
+        """Title bar + taskbar icon from our own .ico (independent of the exe icon cache / pywebview default)."""
+        try:
+            import ctypes
+            ico = str(ui_dir() / "AirScreen.ico")
+            hwnd = window.native.Handle.ToInt32()
+            user32 = ctypes.windll.user32
+            for which, size in ((0, 16), (1, 48)):       # ICON_SMALL, ICON_BIG
+                h = user32.LoadImageW(None, ico, 1, size, size, 0x10)   # IMAGE_ICON, LR_LOADFROMFILE
+                if h:
+                    user32.SendMessageW(hwnd, 0x80, which, h)           # WM_SETICON
+        except Exception:
+            pass
+
     def on_loaded() -> None:
+        set_window_icon()
         dark_titlebar()
         try:  # first paint straight away; later updates are polled by the page
             window.evaluate_js("window.__boot && window.__boot(%s)" % json.dumps(api.state()))
         except Exception:
             pass
 
+    def on_closing() -> None:
+        api.shutdown()         # covers Alt+F4 / taskbar close as well as our own close button
+
     window.events.loaded += on_loaded
+    window.events.closing += on_closing
+    api.window_ready = True
     webview.start(debug=bool(os.environ.get("AIRSCREEN_DEBUG")), private_mode=False,
                   storage_path=str(data_dir() / "webview"))
+    api.shutdown()
+    api.log("AirScreen closed")
+    if getattr(sys, "frozen", False):
+        os._exit(0)            # skip interpreter finalisation: daemon threads inside COM/ctypes can crash it
     return 0
