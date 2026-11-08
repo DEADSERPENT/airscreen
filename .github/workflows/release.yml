@@ -33,11 +33,16 @@ jobs:
         with:
           path: ~/.gradle/wrapper/dists
           key: gradle-wrapper-${{ hashFiles('receiver/gradle/wrapper/gradle-wrapper.properties') }}
-      - name: Fetch Gradle (retries when GitHub's download servers return 5xx)
+      - name: Fetch Gradle (retry, then a checksum-verified mirror if GitHub's downloads are down)
         working-directory: receiver
         run: |
           chmod +x gradlew
-          for i in 1 2 3 4 5 6 7 8; do ./gradlew --version && exit 0; echo "retry $i"; sleep $((i*20)); done; exit 1
+          for i in 1 2 3; do ./gradlew --version && exit 0; echo "retry $i"; sleep $((i*15)); done
+          echo "GitHub download unavailable: using a mirror, verified against the published checksum"
+          curl -fsSL --retry 3 -o /tmp/gradle-8.7-bin.zip https://mirrors.cloud.tencent.com/gradle/gradle-8.7-bin.zip
+          echo "544c35d6bd849ae8a5ed0bcea39ba677dc40f49df7d1835561582da2009b961d  /tmp/gradle-8.7-bin.zip" | sha256sum -c -
+          sed -i 's#^distributionUrl=.*#distributionUrl=file\:///tmp/gradle-8.7-bin.zip#; s#^validateDistributionUrl=.*#validateDistributionUrl=false#' gradle/wrapper/gradle-wrapper.properties
+          ./gradlew --version
       - run: ./gradlew assembleDebug
         working-directory: receiver
       - run: cp receiver/app/build/outputs/apk/debug/app-debug.apk AirScreen-TV.apk
