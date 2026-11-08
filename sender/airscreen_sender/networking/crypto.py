@@ -121,3 +121,14 @@ def sas(shared: bytes, ns: bytes, nr: bytes) -> str:
     """4-digit number both screens show. A man in the middle ends up with two different shared secrets, so the numbers differ."""
     h = hmac.new(shared, b"AirScreen-verify" + ns + nr, hashlib.sha256).digest()
     return f"{int.from_bytes(h[:4], 'big') % 10000:04d}"
+
+
+# ---- security level 2: commit-then-reveal for the sender's key, pair-key proof bound to the key exchange ----
+def commit(ns: bytes, device_id: str, pub: bytes) -> bytes:
+    """Sender commits to its ephemeral public key BEFORE the TV reveals its own (stops grinding the 4-digit number)."""
+    return hashlib.sha256(b"AirScreen-commit" + ns + device_id.encode() + pub).digest()
+
+
+def pair_key_proof(shared: bytes, ns: bytes, nr: bytes, pair_key: str, pub_s: bytes, pub_r: bytes) -> bytes:
+    """Proves knowledge of the pair key without sending it; keyed by the ECDH secret and bound to both public keys."""
+    return hmac.new(shared, b"AirScreen-pairkey" + ns + nr + pair_key.encode() + pub_s + pub_r, hashlib.sha256).digest()

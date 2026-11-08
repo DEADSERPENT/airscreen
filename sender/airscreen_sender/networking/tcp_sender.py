@@ -13,6 +13,7 @@ from .protocol import (FLAG_KEYFRAME, HEADER_SIZE, TYPE_AUDIO, TYPE_AUTH_CHALLEN
                        hello_payload, pack_header, pack_message, parse_header)
 from .trust_store import TrustStore
 
+SEQ_LIMIT = 0xFFFFFF00   # AES-GCM nonce = sequence number: never let it wrap under one key
 BEHIND_LIMIT = 40  # queued messages (~0.5 s of video+audio) before we declare the network behind
 
 
@@ -54,8 +55,10 @@ def handshake(sock: socket.socket, store: TrustStore, pair_key: str | None,
     screens show the same 4-digit number. Returns (cipher, receiver_name, receiver_capabilities)."""
     import hmac
     ns = crypto.new_nonce()
+    priv, pub = crypto.new_keypair()      # chosen now so we can commit to it before the TV reveals its key
     sock.sendall(pack_message(TYPE_AUTH_REQUEST, 0, 0, json.dumps(
-        {"device_id": store.device_id, "name": store.device_name, "ns": ns.hex()}).encode()))
+        {"device_id": store.device_id, "name": store.device_name, "ns": ns.hex(),
+         "commit": crypto.commit(ns, store.device_id, pub).hex()}).encode()))
     typ, ch = _read_control(sock, (TYPE_AUTH_CHALLENGE, TYPE_AUTH_FAIL))
     if typ == TYPE_AUTH_FAIL:
         raise AuthError(ch.get("reason", "receiver refused the connection"))
@@ -89,14 +92,15 @@ def handshake(sock: socket.socket, store: TrustStore, pair_key: str | None,
     except ValueError as e:
         raise AuthError(str(e)) from e
     rpub = ch.get("rpub")
-    if not rpub:
-        raise AuthError("This TV app is too old for approval pairing. Update AirScreen on the TV.")
-    priv, pub = crypto.new_keypair()
-    shared = crypto.ecdh(priv, bytes.fromhex(rpub))
+    if not rpub or int(ch.get("sec", 1)) < 2:
+        raise AuthError("This TV app is too old for secure pairing. Update AirScreen on the TV.")
+    rpub_b = bytes.fromhex(rpub)
+    shared = crypto.ecdh(priv, rpub_b)
     if on_verify:
         on_verify(crypto.sas(shared, ns, nr))          # show the same number on the PC while the TV asks
     sock.sendall(pack_message(TYPE_AUTH_PROOF, 1, 0, json.dumps(
-        {"mode": "request", "pub": pub.hex(), "key": k}).encode()))
+        {"mode": "request", "pub": pub.hex(),
+         "kp": crypto.pair_key_proof(shared, ns, nr, k, pub, rpub_b).hex()}).encode()))   # the pair key itself is never sent
     typ, ok = _read_control(sock, (TYPE_AUTH_OK, TYPE_AUTH_FAIL))
     if typ == TYPE_AUTH_FAIL:
         raise AuthError(ok.get("reason", "the TV refused the request"))
@@ -169,6 +173,8 @@ class TcpSender:
     # --- send thread ---
     def _send(self, msg_type: int, flags: int, pts_us: int, payload: bytes) -> None:
         seq = self._seq
+        if seq >= SEQ_LIMIT:
+            raise ConnectionError("session sequence exhausted: reconnecting with a fresh key")
         self._seq += 1
         header = pack_header(msg_type, seq, pts_us, len(payload) + crypto.TAG_SIZE, flags)
         data = header + self._cipher.seal(seq, payload, header)

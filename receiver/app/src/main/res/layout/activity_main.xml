@@ -126,17 +126,17 @@
 
             <FrameLayout
                 android:id="@+id/hero"
-                android:layout_width="170dp"
+                android:layout_width="230dp"
                 android:layout_height="150dp"
                 android:clipChildren="false">
 
                 <ImageView
-                    android:layout_width="170dp"
+                    android:layout_width="230dp"
                     android:layout_height="150dp"
                     android:layout_gravity="center"
-                    android:contentDescription="AirScreen"
+                    android:contentDescription="@null"
                     android:scaleType="fitCenter"
-                    android:src="@drawable/brand_logo" />
+                    android:src="@drawable/hero_scene" />
             </FrameLayout>
 
             <TextView

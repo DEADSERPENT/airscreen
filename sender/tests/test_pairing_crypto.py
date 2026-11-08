@@ -30,3 +30,12 @@ def test_pair_key_format():
     for bad in ("ABC", "ABC-DEF-G", "AB0-O1I"):
         with pytest.raises(ValueError):
             crypto.normalize_key(bad)
+
+
+def test_commit_and_pair_key_proof_match_the_shared_vectors():
+    import json, pathlib
+    v = json.loads((pathlib.Path(__file__).parents[2] / "shared" / "test-data" / "crypto_vectors.json").read_text())
+    ns, nr = bytes.fromhex(v["ns"]), bytes.fromhex(v["nr"])
+    pub_s, pub_r = bytes.fromhex(v["pair_pub_s_hex"]), bytes.fromhex(v["pair_pub_r_hex"])
+    assert crypto.commit(ns, v["device_id"], pub_s).hex() == v["commit"]
+    assert crypto.pair_key_proof(bytes.fromhex(v["pair_shared_hex"]), ns, nr, v["pair_key"], pub_s, pub_r).hex() == v["pair_key_proof"]

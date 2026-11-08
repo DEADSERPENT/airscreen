@@ -111,7 +111,8 @@ class StreamServer(
                 input.readFully(headerBytes)
                 val h = Protocol.parseHeader(headerBytes)
                 if (h.seq != expectedSeq) throw Protocol.ProtocolException("sequence gap: expected $expectedSeq got ${h.seq}")
-                expectedSeq = (expectedSeq + 1) and 0xFFFFFFFFL
+                if (expectedSeq >= SEQ_LIMIT) throw Protocol.ProtocolException("session sequence exhausted")   // never reuse an AES-GCM nonce
+                expectedSeq += 1
                 if (h.type >= Protocol.TYPE_AUTH_REQUEST) throw Protocol.ProtocolException("unexpected auth message")
                 if (h.length < TAG_BYTES) throw Protocol.ProtocolException("payload shorter than auth tag")
 
@@ -179,7 +180,7 @@ class StreamServer(
         val eph = try { Crypto.newKeyPair() } catch (e: Exception) { null }       // P-256: supported on every Android version
         val challenge = JSONObject()
             .put("nr", Crypto.hex(nr)).put("receiver_id", trust.receiverId).put("name", trust.name)
-            .put("trusted", trustedKey != null).put("caps", capabilities())
+            .put("trusted", trustedKey != null).put("caps", capabilities()).put("sec", 2)
         if (eph != null) challenge.put("rpub", Crypto.hex(eph.second))
         send(out, Protocol.TYPE_AUTH_CHALLENGE, 0, challenge)
 
@@ -192,17 +193,26 @@ class StreamServer(
         val mode = proof.getString("mode")
 
         if (mode == "request") {
-            // New PC: it must show the pair key from this screen, then a person approves here. Never silent.
+            // New PC: commit-then-reveal key exchange, pair-key proof, then a person approves here. Never silent.
+            val ip = c.inetAddress?.hostAddress ?: "?"
+            val commit = req.optString("commit", "")
+            if (commit.isEmpty()) fail(out, "This PC app is too old for secure pairing. Update AirScreen on the PC.")
             val e = eph ?: fail(out, "this TV cannot pair by approval")
-            val keyBytes = pairing.secretForAttempt() ?: fail(out, "pairing is locked, try again shortly")
-            val given = proof.optString("key", "").uppercase().toByteArray()
-            if (!MessageDigest.isEqual(keyBytes, given)) {
-                pairing.registerFailure()
-                fail(out, "wrong pair key")
-            }
+            val keyBytes = pairing.secretForAttempt(ip) ?: fail(out, "pairing is locked, try again shortly")
             val peer = Crypto.unhex(proof.getString("pub"))
             if (peer.size != 65) throw Protocol.ProtocolException("bad key")
+            val committed = runCatching { Crypto.unhex(commit) }.getOrDefault(ByteArray(0))
+            if (!MessageDigest.isEqual(Crypto.commit(ns, deviceId, peer), committed)) {
+                pairing.registerFailure(ip)
+                fail(out, "pairing commitment mismatch")
+            }
             val shared = Crypto.ecdh(e.first, peer)
+            val expected = Crypto.pairKeyProof(shared, ns, nr, String(keyBytes), peer, e.second)
+            val given = runCatching { Crypto.unhex(proof.optString("kp", "")) }.getOrDefault(ByteArray(0))
+            if (!MessageDigest.isEqual(expected, given)) {
+                pairing.registerFailure(ip)
+                fail(out, "wrong pair key")
+            }
             val verify = Crypto.sas(shared, ns, nr)                    // the PC shows the same number: a mismatch means someone is in the middle
             val approved = listener.onPairRequest(sanitizeName(req.optString("name", "PC")), verify)
             deadline = System.nanoTime() + HANDSHAKE_TOTAL_MS * 1_000_000L   // the person took their time; the rest is quick
@@ -280,6 +290,7 @@ class StreamServer(
         const val DEFAULT_PORT = 5000
         private const val HANDSHAKE_TIMEOUT_MS = 10_000
         private const val HANDSHAKE_TOTAL_MS = 15_000L
+        private const val SEQ_LIMIT = 0xFFFFFF00L
         private const val READ_TIMEOUT_MS = 5000
         private const val TAG_BYTES = 16
         private val DEVICE_ID_REGEX = Regex("^[A-Za-z0-9]{1,64}$")

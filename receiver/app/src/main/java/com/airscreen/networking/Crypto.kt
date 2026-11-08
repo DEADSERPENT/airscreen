@@ -76,6 +76,14 @@ object Crypto {
         return "%04d".format(n % 10000)
     }
 
+    /** Sender's commitment to its ephemeral public key, sent before the TV reveals its own (stops grinding the 4-digit number). */
+    fun commit(ns: ByteArray, deviceId: String, pub: ByteArray): ByteArray =
+        java.security.MessageDigest.getInstance("SHA-256").digest("AirScreen-commit".toByteArray() + ns + deviceId.toByteArray() + pub)
+
+    /** Pair-key proof keyed by the ECDH secret and bound to both public keys; the pair key itself never crosses the network. */
+    fun pairKeyProof(shared: ByteArray, ns: ByteArray, nr: ByteArray, pairKey: String, pubS: ByteArray, pubR: ByteArray): ByteArray =
+        hmac(shared, "AirScreen-pairkey".toByteArray(), ns, nr, pairKey.toByteArray(), pubS, pubR)
+
     fun randomBytes(n: Int): ByteArray = ByteArray(n).also { random.nextBytes(it) }
 
     private fun hmac(key: ByteArray, vararg parts: ByteArray): ByteArray {

@@ -37,4 +37,14 @@ class CryptoTest {
         sealed[0] = (sealed[0].toInt() xor 1).toByte()
         Crypto.MediaCipher(key).open(5, sealed, "header-bytes".toByteArray())
     }
+
+    private fun bytes(n: Int, from: Int) = ByteArray(n) { (from + it).toByte() }
+
+    @Test fun commitVector() = assertEquals(
+        "2a0a11d84d657e34727fe640346e8c692f475565aded79bf821cd82ca829b1e1",
+        Crypto.hex(Crypto.commit(ns, "dev1", byteArrayOf(4) + bytes(64, 1))))
+
+    @Test fun pairKeyProofVector() = assertEquals(
+        "b06412453e99ce16d00685b92edbb4259f42af21cde8a328a58bd9f1b0044e7d",
+        Crypto.hex(Crypto.pairKeyProof(bytes(32, 0), ns, nr, "K7X3QD", byteArrayOf(4) + bytes(64, 1), byteArrayOf(4) + bytes(64, 65))))
 }

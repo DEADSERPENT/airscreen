@@ -25,13 +25,15 @@ Handshake messages are plaintext and use their own seq (0,1). After AUTH_OK, typ
 seq restarts at 0.
 
 ## Security
-- **Pairing (first time), approval-based:** the TV shows a short **pair key** (6 characters, shown as `XXX-XXX`, single use,
-  expires after 10 min, 5 wrong tries lock pairing for 30 s). The PC sends the key plus an ephemeral **P-256 ECDH** public key
-  (`AUTH_PROOF {mode:"request", pub, key}`); the TV's challenge carries its own ephemeral key (`rpub`). Both sides derive the
-  shared secret and a **4-digit verification number** `HMAC(shared, "AirScreen-verify"||ns||nr)`. The TV immediately pops up
-  Allow / Deny showing the PC's name and the number; the PC shows the same number. A man in the middle ends up with two
-  different secrets, so the numbers differ and the person presses Deny. Never silent: a timeout is a denial.
-  The pair key only proves the request comes from someone who can see the TV; the security is the approval + number.
+- **Pairing (first time), security level 2** (full rationale: `docs/PAIRING_DESIGN.md`): the TV shows a short **pair key**
+  (`XXX-XXX`, single use, expires after 10 min). The PC commits to its ephemeral P-256 key in `AUTH_REQUEST`
+  (`commit = SHA256("AirScreen-commit" || ns || device_id || pub_S)`), the TV's challenge carries `rpub` and `sec: 2`, then the PC
+  reveals `AUTH_PROOF {mode:"request", pub, kp}` with `kp = HMAC(shared, "AirScreen-pairkey" || ns || nr || pair_key || pub_S || rpub)`.
+  The TV checks the commitment and `kp` (the pair key is never sent), derives the 4-digit number
+  `HMAC(shared, "AirScreen-verify" || ns || nr)` shown on both screens, and a person presses **Allow** on the TV.
+  A TV that does not send `sec: 2` is refused for pairing; a TV rejects any pairing request without `commit`.
+  Wrong tries lock the offending IP (5 tries, 60 s doubling to 15 min); the key rotates only after 3 lockouts in 10 min.
+  The session ends before the 32-bit sequence number can wrap (GCM nonce is never reused).
 - **Trusted devices:** after approval both sides store `device_key = HKDF(shared, ns||nr, "AirScreen-device-key")`.
   Later sessions use `AUTH_PROOF {mode:"trusted"}` with HMAC over fresh nonces; no key, no prompt.
 - **Media:** `session_key = HKDF(key, salt=ns||nr, info="AirScreen-session")`; payload = AES-256-GCM(plaintext),

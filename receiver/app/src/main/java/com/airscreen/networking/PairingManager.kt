@@ -7,8 +7,6 @@ package com.airscreen.networking
 class PairingManager(private val onChanged: (String) -> Unit = {}) {
     @Volatile private var code = Crypto.newPairKey()
     private var issuedAt = System.currentTimeMillis()
-    private var failures = 0
-    private var lockedUntil = 0L
 
     @Synchronized
     fun displayCode(): String {
@@ -16,19 +14,32 @@ class PairingManager(private val onChanged: (String) -> Unit = {}) {
         return Crypto.formatKey(code)
     }
 
-    /** Secret to authenticate a pairing attempt, or null while locked out. */
+    private class Peer { var failures = 0; var lockedUntil = 0L; var locks = 0 }
+    private val peers = HashMap<String, Peer>()
+    private val lockEvents = ArrayDeque<Long>()
+
+    /** Secret to authenticate a pairing attempt, or null while THIS host is locked out (other hosts are unaffected). */
     @Synchronized
-    fun secretForAttempt(): ByteArray? {
+    fun secretForAttempt(ip: String): ByteArray? {
         rotateIfExpired()
-        return if (System.currentTimeMillis() < lockedUntil) null else code.toByteArray()
+        val p = peers[ip]
+        return if (p != null && System.currentTimeMillis() < p.lockedUntil) null else code.toByteArray()
     }
 
+    /** 5 wrong tries lock that host for 60 s (doubling to 15 min). The key only rotates when several hosts get locked out. */
     @Synchronized
-    fun registerFailure() {
-        failures++
-        if (failures >= MAX_FAILURES) {
-            lockedUntil = System.currentTimeMillis() + LOCKOUT_MS
-            rotate()
+    fun registerFailure(ip: String) {
+        val now = System.currentTimeMillis()
+        if (peers.size > 256) peers.clear()
+        val p = peers.getOrPut(ip) { Peer() }
+        p.failures++
+        if (p.failures >= MAX_FAILURES) {
+            p.failures = 0
+            p.locks++
+            p.lockedUntil = now + minOf(LOCKOUT_MS shl (p.locks - 1).coerceAtMost(4), MAX_LOCKOUT_MS)
+            lockEvents.addLast(now)
+            while (lockEvents.isNotEmpty() && now - lockEvents.first() > 10 * 60_000L) lockEvents.removeFirst()
+            if (lockEvents.size >= 3) { lockEvents.clear(); rotate() }       // distributed guessing: the key must not stay valid
         }
     }
 
@@ -36,7 +47,6 @@ class PairingManager(private val onChanged: (String) -> Unit = {}) {
     fun rotate() {
         code = Crypto.newPairKey()
         issuedAt = System.currentTimeMillis()
-        failures = 0
         onChanged(Crypto.formatKey(code))
     }
 
@@ -46,7 +56,8 @@ class PairingManager(private val onChanged: (String) -> Unit = {}) {
 
     private companion object {
         const val MAX_FAILURES = 5
-        const val LOCKOUT_MS = 30_000L
+        const val LOCKOUT_MS = 60_000L
+        const val MAX_LOCKOUT_MS = 15 * 60_000L
         const val EXPIRY_MS = 10 * 60_000L
     }
 }
