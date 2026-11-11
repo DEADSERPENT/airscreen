@@ -367,9 +367,9 @@ class MainActivity : Activity(), SurfaceHolder.Callback, StreamServer.Listener {
                     if (n == 0) "A PC appears here after you pair it." else "Press OK to forget all paired PCs.")
             }
             1 -> setDetail("Diagnostics", diagRows(), "“Reported” comes from this TV. “Measured” comes from your last stream.")
-            else -> setDetail("About", listOf("Version" to "AirScreen ${versionName()}", "Developer" to "Deadserpent Corporation", "Protocol" to "v${Protocol.VERSION}",
+            else -> setDetail("About", listOf("Version" to "AirScreen ${versionName()}", "Developer" to "Deadserpent", "Protocol" to "v${Protocol.VERSION}",
                 "Device" to "${Build.MANUFACTURER} ${Build.MODEL}", "Android" to "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})"),
-                "© 2026 Deadserpent Corporation. No account, no cloud, no telemetry.")
+                "© 2026 Deadserpent. No account, no cloud, no telemetry.")
         }
     }
 
