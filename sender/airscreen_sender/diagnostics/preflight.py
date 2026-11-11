@@ -78,7 +78,7 @@ def pick_encoder(ffmpeg: str) -> tuple[str | None, list[Check]]:
 def check_gpu() -> Check:
     smi = shutil.which("nvidia-smi")
     if not smi:
-        return Check("nvidia-gpu", False, "nvidia-smi not found")
+        return Check("nvidia-gpu", False, "nvidia-smi not found (fine on AMD/Intel PCs)")
     out = _run([smi, "--query-gpu=name,driver_version", "--format=csv,noheader"]).strip()
     return Check("nvidia-gpu", bool(out), out or "no NVIDIA GPU reported")
 
@@ -92,7 +92,7 @@ def check_receiver(ip: str, port: int, timeout: float = 3.0) -> Check:
 
 
 def run_all(ffmpeg: str = "ffmpeg", ip: str = "", port: int = 5000) -> list[Check]:
-    checks = [check_ffmpeg(ffmpeg), check_gpu(), check_nvenc(ffmpeg)]
+    checks = [check_ffmpeg(ffmpeg), check_gpu()] + [check_encoder(ffmpeg, n) for n in HW_ENCODERS + ("libx264",)]
     if ip:
         checks.append(check_receiver(ip, port))
     return checks

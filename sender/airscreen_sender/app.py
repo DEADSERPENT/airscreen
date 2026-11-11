@@ -327,7 +327,7 @@ class Api:
     def checks(self) -> list:
         ff = resolve_ffmpeg()
         out = []
-        for c in [preflight.check_ffmpeg(ff)] + [preflight.check_encoder(ff, n) for n in preflight.HW_ENCODERS]:
+        for c in [preflight.check_ffmpeg(ff)] + [preflight.check_encoder(ff, n) for n in preflight.HW_ENCODERS + ("libx264",)]:
             out.append({"name": c.name, "ok": c.ok, "detail": c.detail})
         return out
 

@@ -3,7 +3,7 @@
 Mirror your Windows screen to an Android TV / Google TV over your own network. Low-latency H.264 (NVIDIA NVENC) video,
 Opus system audio, AES-256-GCM encryption, and pairing that you approve on the TV. No account, no cloud, no telemetry.
 
-By **Deadserpent Corporation** · MIT licensed
+By **Deadserpent** · MIT licensed
 
 ## Get it
 Download from the [Releases](../../releases) page:
@@ -16,7 +16,7 @@ Download from the [Releases](../../releases) page:
 3. First time only: confirm the same 4-digit number on both screens and press **Allow** on the TV. Next time it just connects.
 
 ## Requirements
-- **PC:** Windows 10/11 with an NVIDIA GPU (NVENC). The installer includes FFmpeg.
+- **PC:** Windows 10 (1809+) or Windows 11, 64-bit. Any GPU: NVIDIA (NVENC), AMD (AMF) or Intel (QSV) is used automatically; with none, AirScreen encodes on the CPU and tells you. The installer includes FFmpeg and sets up the WebView2 runtime if it is missing.
 - **TV:** Android TV / Google TV, Android 8+, H.264 hardware decoder, on the same network (5 GHz Wi-Fi or Ethernet recommended).
 
 ## Build from source
@@ -27,6 +27,7 @@ python -m pytest tests
 python -m airscreen_sender                 # run
 cd .. && pyinstaller scripts/AirScreen.spec --noconfirm
 iscc scripts\AirScreen.iss                 # installer -> installer\ (needs Inno Setup 6 and an ffmpeg.exe)
+powershell -File scriptsuild-msix.ps1 -FFmpeg C:fmpegfmpeg.exe   # Microsoft Store .msix (needs the Windows SDK)
 
 # TV app
 cd receiver && gradlew assembleDebug testDebugUnitTest
@@ -38,7 +39,7 @@ DXcam capture → FFmpeg (NVENC H.264, WASAPI loopback → Opus) → encrypted T
 `shared/protocol/PROTOCOL.md`. Security model and open items: `SECURITY.md`, `docs/SECURITY_NOTES.md`.
 
 ## Known limits (be honest with users)
-- Windows sender needs an NVIDIA GPU today; AMD/Intel encoders and macOS/Linux senders are not implemented.
+- Windows x64 only (no ARM64 build yet); AMD/Intel encoders are implemented but untested on real hardware; CPU encoding uses noticeably more CPU. No macOS/Linux sender.
 - Plain TCP transport, 1080p30-class quality over typical Wi-Fi; no live resolution adaptation yet.
 - The TV APK is debug-signed (sideload). The Windows installer is not code-signed, so SmartScreen may warn.
 - Tested on one TV (Sony BRAVIA VU31) and one PC; please report hardware results in Issues.

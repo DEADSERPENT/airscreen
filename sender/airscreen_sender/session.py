@@ -108,9 +108,14 @@ class StreamSession:
             if cfg.encoder == "auto":
                 chosen, results = preflight.pick_encoder(cfg.ffmpeg_path)
                 if chosen is None:
-                    detail = "; ".join(f"{c.name}: {c.detail}" for c in results)
-                    raise RuntimeError("No supported GPU video encoder found (NVIDIA NVENC, AMD AMF or Intel QSV). " + detail)
-                cfg = dataclasses.replace(cfg, encoder=chosen)
+                    # No usable GPU encoder (older/virtual/ARM PCs): use the CPU so AirScreen still works, and say so.
+                    sw = preflight.check_encoder(cfg.ffmpeg_path, "libx264")
+                    if not sw.ok:
+                        detail = "; ".join(f"{c.name}: {c.detail}" for c in results + [sw])
+                        raise RuntimeError("No usable video encoder found (NVIDIA NVENC, AMD AMF, Intel QSV or CPU x264). " + detail)
+                    chosen = "libx264"
+                    self._status("No GPU encoder found: using CPU encoding (higher CPU use)")
+                cfg = dataclasses.replace(cfg, encoder=chosen, allow_cpu_fallback=True)
             elif cfg.encoder in preflight.HW_ENCODERS:
                 chk = preflight.check_encoder(cfg.ffmpeg_path, cfg.encoder)
                 if not chk.ok:
